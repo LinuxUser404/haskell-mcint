@@ -25,4 +25,5 @@ Tested with:
 ghc-7.10.3
 cabal-1.22.8
 haskell-platform-2013.2
+base-4.8.2.0
 ```

@@ -19,7 +19,7 @@ executable haskell-mcint
   main-is:             haskell-mcint.hs
   -- other-modules:       
   -- other-extensions:    
-  build-depends:       base >=4.8 && <4.9,
+  build-depends:       base >=4.8 && <5.0,
                        OpenCL,
                        numbers
   hs-source-dirs:      src
