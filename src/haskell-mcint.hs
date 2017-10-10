@@ -18,17 +18,16 @@ import FunctionTypes
 
 main :: IO ()
 main = do
-
---  kernel    <- openFile "kernel.cl" ReadMode      -- kernel is the file handle
---  clText    <- hGetContents kernel                -- clText contains contents of kernel as a String
+  -- initialize OpenCL and print some information about it
   platforms <- clGetPlatformIDs
-  hPutStrLn stdout $ "There are " ++ ((show . length) (platforms)) ++ " platforms, using:"
+  hPutStrLn stdout $ "There are " ++ ((show . length) (platforms)) ++ " OpenCL platforms."
   vendor  <- ((oclPlatformInfo platforms) !! platformNumber)
-  hPutStrLn stdout $ "[" ++ (show platformNumber) ++ "]" ++ vendor
-  hPutStrLn stdout ""
+  hPutStrLn stdout $ "Selected platform: [" ++ (show platformNumber) ++ "]" ++ vendor
   (device:_) <- clGetDeviceIDs (platforms!!platformNumber) CL_DEVICE_TYPE_GPU -- possible options: CPU, GPU, ALL, DEFAULT, ACCELERATOR
   deviceName <- clGetDeviceName device
-  hPutStrLn stdout $ "Device: " ++ deviceName -- in my case Quadro K4200
+  hPutStrLn stdout $ "Selected device: " ++ deviceName -- in my case Quadro K4200
+  
+  -- print generated OpenCL kernel
   hPutStrLn stdout ""
   hPutStrLn stdout $ "Using kernel:\n" ++ clText
   hPutStrLn stdout ""
@@ -62,7 +61,7 @@ main = do
 oclPlatformInfo :: [CLPlatformID] -> [IO String]
 oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
 
-testFunction = FunctionExpression "dupplicate" "2 * x1" ["x1"]
+testFunction = FunctionExpression "multiplyBy2" "2 * x1" ["x1"]
 
 -- the program should take something like this as an input and produce the result
 testInput = "Integrate[1/(x^3 + 1), {x, 0, 1}]"
@@ -75,13 +74,15 @@ Major TODOs:
 1) use function to generate function object from a string
 2) use function to generate OpenCL kernel from a function object
 3) use function to generate sequence of points
+4) add metrics(time, precision)
 
 
 TODO: Consider following improvements
-Display all platforms
-Allow the user to choose the platform
-Display all devices
-Allow to chose the device
-Add class for kernel function with constructor
-Wrap kernel compilation in a function
+1) Display all platforms
+2) Allow the user to choose the platform
+3) Display all devices
+4) Allow to chose the device
+5) Add class for kernel function with constructor
+6) Wrap kernel compilation in a function
+7) Monad for function construction
 -}
