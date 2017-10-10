@@ -1,6 +1,13 @@
 # haskell-mcint
 
-To build the program just run the following command:
+To build and execute in one command just run:
+
+```
+cabal run
+```
+
+
+To build the program run:
 
 ```
 cabal install
@@ -12,8 +19,10 @@ The executable will be in:
 ./dist/build/haskell-mcint/
 ```
 
-The program requires an OpenCL kernel file to be in the same directory. It is located in:
+Tested with:
 
 ```
-./src/kernel.cl
+ghc-7.10.3
+cabal-1.22.8
+haskell-platform-2013.2
 ```
