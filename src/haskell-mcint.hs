@@ -69,7 +69,7 @@ oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
 -- TODO: multivariable and position independent function
 testFunction = FunctionExpression "multiplyBy2" "2 * x1" ["x1"]
 
--- the program should take something like this as an input and produce the result
+-- GOAL: the program should take something like this as an input and produce the result
 testInput = "Integrate[1/(x^3 + 1)/(y^3 + 1), {x, 0, 1}, {y, 0, 1}]"
 testNumOutput = showCReal 100 $ ((1/18) * (2 * sqrt(3) * pi + log(64))) ** 2 -- the exact number with 100 digits precision
 testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477469051938999891540922414594979416232" -- the value of testNumOutput
