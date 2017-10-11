@@ -41,13 +41,13 @@ main = do
   
   -- define inputs, outputs and corresponding pointers
   x1s <- newArray (xsData!!0)
-  x2s <- newArray (xsData!!1)
   mem_x1s <- createConstBuffer context vecSize (castPtr x1s)
+  clSetKernelArgSto kernel 1 mem_x1s  -- kernel's 1st agrument
+  x2s <- newArray (xsData!!1)
   mem_x2s <- createConstBuffer context vecSize (castPtr x2s)
+  clSetKernelArgSto kernel 2 mem_x2s  -- kernel's 2nd agrument
   mem_out <- clCreateBuffer context [CL_MEM_WRITE_ONLY] (vecSize, nullPtr)
   clSetKernelArgSto kernel 0 mem_out  -- kernel's 0th agrument
-  clSetKernelArgSto kernel 1 mem_x1s  -- kernel's 1st agrument
-  clSetKernelArgSto kernel 2 mem_x2s  -- kernel's 2nd agrument
   
   -- create command queue and queue the execution on a device
   q <- clCreateCommandQueue context device [] -- creates command queue with default properties []
@@ -58,6 +58,7 @@ main = do
   -- print arrays
   foldr1 (>>) $ fmap (\i -> (myPrint $ "Input array" ++ (show i) ++ " = " ++ show (xsData!!i))) [0..nD-1]
   myPrint $ "Output array = " ++ show outputData
+  
   return()
     where
       platformNumber = 0  -- using the first platform
