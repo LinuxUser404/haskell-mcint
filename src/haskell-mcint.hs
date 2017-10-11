@@ -78,7 +78,7 @@ main = do
 oclPlatformInfo :: [CLPlatformID] -> [IO String]
 oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
 
--- TODO: multivariable and position independent function
+
 testFunction = FunctionExpression "myAdd" "x1# + x2#" ["x1","x2"]
 
 -- GOAL: the program should take something like this as an input and produce the result
