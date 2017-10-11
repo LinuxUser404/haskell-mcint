@@ -21,28 +21,29 @@ main :: IO ()
 main = do
   -- initialize OpenCL and print some information about it
   platforms <- clGetPlatformIDs
-  hPutStrLn stdout $ "There are " ++ ((show . length) (platforms)) ++ " OpenCL platforms."
+  myPrint $ "There are " ++ ((show . length) (platforms)) ++ " OpenCL platforms."
   vendor  <- ((oclPlatformInfo platforms) !! platformNumber)
-  hPutStrLn stdout $ "Selected platform: [" ++ (show platformNumber) ++ "]" ++ vendor
+  myPrint $ "Selected platform: [" ++ (show platformNumber) ++ "]" ++ vendor
   device <- head `fmap` clGetDeviceIDs (platforms!!platformNumber) CL_DEVICE_TYPE_GPU -- possible options: CPU, GPU, ALL, DEFAULT, ACCELERATOR
   deviceName <- clGetDeviceName device
-  hPutStrLn stdout $ "Selected device: " ++ deviceName -- in my case Quadro K4200
+  myPrint $ "Selected device: " ++ deviceName -- in my case Quadro K4200
   
   -- print generated OpenCL kernel
-  hPutStrLn stdout ""
-  hPutStrLn stdout $ "Using kernel:\n" ++ clText
-  hPutStrLn stdout ""
+  myPrint ""
+  myPrint $ "Using kernel:\n" ++ clText
+  myPrint ""
   
   -- create context and compile OpenCL program
-  context <- clCreateContext [CL_CONTEXT_PLATFORM (platforms!!platformNumber)] [device] $ hPutStrLn stdout -- uses "hPutStrLn stdout" to display text output(if something goes wrong)
+  context <- clCreateContext [CL_CONTEXT_PLATFORM (platforms!!platformNumber)] [device] $ myPrint -- uses myPrint to display text output(if something goes wrong)
   program <- clCreateProgramWithSource context clText -- creates OpenCL program from the kernel source
   clBuildProgram program [device] "" -- compiles the program without any specific optimization options ""
   kernel <- clCreateKernel program functionName -- function name in the source
   
-  x1s <- newArray x1sData
-  x2s <- newArray x2sData
-  mem_x1s <- clCreateBuffer context [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR] (vecSize, castPtr x1s)  
-  mem_x2s <- clCreateBuffer context [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR] (vecSize, castPtr x2s)  
+  -- define inputs, outputs and corresponding pointers
+  x1s <- newArray (xsData!!0)
+  x2s <- newArray (xsData!!1)
+  mem_x1s <- createConstBuffer context vecSize (castPtr x1s)
+  mem_x2s <- createConstBuffer context vecSize (castPtr x2s)
   mem_out <- clCreateBuffer context [CL_MEM_WRITE_ONLY] (vecSize, nullPtr)
   clSetKernelArgSto kernel 0 mem_out  -- kernel's 0th agrument
   clSetKernelArgSto kernel 1 mem_x1s  -- kernel's 1st agrument
@@ -54,21 +55,22 @@ main = do
   eventRead <- clEnqueueReadBuffer q mem_out True 0 vecSize (castPtr x1s) [eventExec] -- read the result once execution is complete
   outputData <- peekArray dataLength x1s
   
-  
-  hPutStrLn stdout $ "Input array1 = " ++ show x1sData
-  hPutStrLn stdout $ "Input array2 = " ++ show x2sData
-  hPutStrLn stdout $ "Output array = " ++ show outputData
+  -- print arrays
+  foldr1 (>>) $ fmap (\i -> (myPrint $ "Input array" ++ (show i) ++ " = " ++ show (xsData!!i))) [0..nD-1]
+  myPrint $ "Output array = " ++ show outputData
   return()
     where
       platformNumber = 0  -- using the first platform
-      vecSize = dataLength * (sizeOf (0 :: CFloat))
-      xsData = (take n [[x,x*2] | x <- [1..]]) :: [[CFloat]]
-      x1sData = (transpose xsData)!!0
-      x2sData = (transpose xsData)!!1
-      dataLength = length xsData
+      numOfPoint = 10
+      nD = length $ variables testFunction -- number of dimensions
+      xsPoints = (take numOfPoint [[x,x*2] | x <- [1..]]) :: [[CFloat]] -- xsPoints - list of points
+      xsData = transpose xsPoints -- xsData - list of lists of point coordinates
+      dataLength = length xsPoints
+      vecSize = dataLength * (sizeOf (0 :: CFloat)) -- size of data transmitted to an OpenCL device
       clText = genKernel testFunction
       functionName = name testFunction
-      n = 10
+      myPrint = hPutStrLn stdout -- prints to stdout, can be easily modified to print to a file or a port
+      createConstBuffer context' size' ptr' = clCreateBuffer context' [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR] (size', ptr')
 
 
 -- replaces list of platfrom IDs with their vendors
@@ -100,4 +102,6 @@ TODO: Consider following improvements
 5) Add class for kernel function with constructor
 6) Wrap kernel compilation in a function
 7) Monad for function construction
+8) GPipe like function modifiers
+9) Prebuild OpenCL binaries
 -}
