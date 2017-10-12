@@ -11,7 +11,7 @@ import FunctionTypes
 
 genKernel :: FunctionExpression -> String
 genKernel expr = "__kernel " ++ "void " ++ (name expr)
-               ++ "(" ++ (intercalate ", " (outarg:args) ) ++ ")"
+               ++ "(" ++ (intercalate ", " (args ++ outarg:[]) ) ++ ")"
                ++ "{"
                ++ "int id = get_global_id(0);"
                ++ "out[id] = " ++ fexpr ++ ";"

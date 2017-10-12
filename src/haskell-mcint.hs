@@ -42,17 +42,14 @@ main = do
   clBuildProgram program [device] "" -- compiles the program without any specific optimization options ""
   kernel <- clCreateKernel program functionName -- function name in the source
   
-  -- define inputs, outputs and corresponding pointers
+  -- allocate memory for input data and pass pointers to it to the kernel
+  -- fist nD arguments are for input data(see KernelGen.hs)
+  foldr1 (>>) $ fmap (\i -> setKernelInputData context kernel (fromIntegral i) (xsData!!i) vecSize) [0..nD-1]
 
-  x1s <- newArray (xsData!!0)
-  mem_x1s <- createConstBuffer context vecSize (castPtr x1s)
-  clSetKernelArgSto kernel 1 mem_x1s  -- kernel's 1st agrument
-  x2s <- newArray (xsData!!1)
-  mem_x2s <- createConstBuffer context vecSize (castPtr x2s)
-  clSetKernelArgSto kernel 2 mem_x2s  -- kernel's 2nd agrument
-  out <- (mallocArray dataLength) :: IO (Ptr CFloat) -- allocate memory for output data(though we could reuse one of the pointers to the input data instead)
+  -- allocate memory for output data(though we could reuse one of the pointers to the input data instead)
+  out <- (mallocArray dataLength) :: IO (Ptr CFloat) -- this pointer is used later to retrieve the data from OpenCL device
   mem_out <- clCreateBuffer context [CL_MEM_WRITE_ONLY] (vecSize, nullPtr)
-  clSetKernelArgSto kernel 0 mem_out  -- kernel's 0th agrument
+  clSetKernelArgSto kernel (fromIntegral nD) mem_out  -- kernel's last agrument is the output(see KernelGen.hs)
   
   -- create command queue and queue the execution on a device
   q <- clCreateCommandQueue context device [] -- creates command queue with default properties []
@@ -68,8 +65,9 @@ main = do
     where
       platformNumber = 0  -- using the first platform
       numOfPoint = 10
+      -- dementions of input data(length xsData) and the function(nD) should be equal!
       nD = length $ variables testFunction -- number of dimensions
-      xsPoints = (take numOfPoint [[x,x*2] | x <- [1..]]) :: [[CFloat]] -- xsPoints - list of points
+      xsPoints = (take numOfPoint [[x,x*2,x*3] | x <- [1..]]) :: [[CFloat]] -- xsPoints - list of points
       xsData = transpose xsPoints -- xsData - list of lists of point coordinates
       dataLength = length xsPoints
       vecSize = dataLength * (sizeOf (0 :: CFloat)) -- size of data transmitted to an OpenCL device
@@ -77,14 +75,14 @@ main = do
       functionName = name testFunction
       myPrint = hPutStrLn stdout -- prints to stdout, can be easily modified to print to a file or a port
       createConstBuffer context' size' ptr' = clCreateBuffer context' [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR] (size', ptr')
-
+      setKernelInputData context' kernel' argNum' data' dataSize' = ((newArray (data')) >>= (\xs -> (createConstBuffer context' dataSize' (castPtr xs)) >>= (\mem_xs -> clSetKernelArgSto kernel' argNum' mem_xs)))
 
 -- replaces list of platfrom IDs with their vendors
 oclPlatformInfo :: [CLPlatformID] -> [IO String]
 oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
 
 
-testFunction = FunctionExpression "Integrate" "x1# + x2#" ["x1","x2"]
+testFunction = FunctionExpression "Integrate" "x1# + x2# + x3#" ["x1","x2","x3"]
 
 -- GOAL: the program should take something like this as an input and produce the result
 testInput = "Integrate[1/(x^3 + 1)/(y^3 + 1), {x, 0, 1}, {y, 0, 1}]"
