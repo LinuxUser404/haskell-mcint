@@ -22,7 +22,7 @@ genKernel expr = "__kernel " ++ "void " ++ (name expr)
     fexpr = substitute (expression expr) (variables expr) "[id]"
     
 
-
+-- write "[id]" instead of "#"
 substitute :: String -> [String] -> String -> String
 substitute [] _ _ = []
 substitute ('#':st) vars ids = ids ++ (substitute st vars ids)

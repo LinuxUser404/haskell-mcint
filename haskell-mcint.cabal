@@ -17,7 +17,7 @@ cabal-version:       >=1.10
 
 executable haskell-mcint
   main-is:             haskell-mcint.hs
-  -- other-modules:       
+  other-modules:       FunctionTypes
   -- other-extensions:    
   build-depends:       base >=4.8 && <5.0,
                        OpenCL,
