@@ -83,6 +83,7 @@ oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
 
 
 testFunction = FunctionExpression "Integrate" "x1# + x2# + x3#" ["x1","x2","x3"]
+testString = "Integrate[x1 + x2, {x1, 0, 10}, {x2, 0, 20}]"
 
 -- GOAL: the program should take something like this as an input and produce the result
 testInput = "Integrate[1/(x^3 + 1)/(y^3 + 1), {x, 0, 1}, {y, 0, 1}]"
@@ -91,6 +92,11 @@ testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477
 
 
 {-
+Next Steps:
+1) Add support for function variable's limits
+2) Implement parser to generate testFunction from a testString
+3) Match dataPoints generation to function dimensions
+
 Major TODOs:
 1) use function to generate function object from a string
 2) use function to generate OpenCL kernel from a function object
