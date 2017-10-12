@@ -94,7 +94,7 @@ testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477
 {-
 Next Steps:
 1) Add support for function variable's limits
-2) Implement parser to generate testFunction from a testString
+2) Implement parser to generate testFunction from a testString(using parser combinator operator <|> )
 3) Match dataPoints generation to function dimensions
 
 Major TODOs:
