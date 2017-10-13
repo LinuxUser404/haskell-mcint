@@ -3,7 +3,9 @@ Author: Nick(Mykola) Pershyn
 Language: Haskell
 Program: Monte-Carlo integration with OpenCL in Haskell
 -}
-module FunctionTypes (FunctionExpression(..)) where 
+module FunctionTypes (FunctionExpression(..),Limits(..)) where 
+
+import Foreign.C.Types( CFloat )
 
 {-
 data IntegrateFunction = IntegrateFunction {
@@ -14,5 +16,10 @@ data IntegrateFunction = IntegrateFunction {
 data FunctionExpression = FunctionExpression {
   name       :: String,
   expression :: String,
-  variables  :: [String]
+  variables  :: [(String, Limits)]
+} deriving Eq
+
+data Limits = Limits {
+  lower :: CFloat,
+  upper :: CFloat
 } deriving Eq

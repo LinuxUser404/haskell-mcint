@@ -9,6 +9,7 @@ import System.IO
 import Control.Parallel.OpenCL
 import Data.Number.CReal( showCReal )  -- arbitrary precision real numbers
 import Data.List
+import Text.ParserCombinators.Parsec
 
 
 import Foreign( castPtr, nullPtr, sizeOf )
@@ -19,9 +20,20 @@ import Foreign.Ptr( Ptr )
 
 import KernelGen ( genKernel )         -- module that generates OpenCL kernels, aka content of a .cl file
 import FunctionTypes
+import FunctionParser
 
 main :: IO ()
 main = do
+  case stringToFunction testString of
+    Left  e -> (hPutStrLn stdout $ show e)
+    Right func -> compute func
+  return ()
+  
+
+
+
+compute :: FunctionExpression -> IO ()
+compute testFunction = do
   -- initialize OpenCL and print some information about it
   platforms <- clGetPlatformIDs
   myPrint $ "There are " ++ ((show . length) (platforms)) ++ " OpenCL platforms."
@@ -67,7 +79,9 @@ main = do
       numOfPoint = 10
       -- dementions of input data(length xsData) and the function(nD) should be equal!
       nD = length $ variables testFunction -- number of dimensions
-      xsPoints = (take numOfPoint [[x,x*2,x*3] | x <- [1..]]) :: [[CFloat]] -- xsPoints - list of points
+      xsPoints = transpose $ fmap ((gen1Dsec numOfPoint) . snd) $ variables testFunction -- xsPoints - list of points
+      gen1Dsec :: Int -> Limits -> [CFloat]
+      gen1Dsec nPoints (Limits l u) = [(l + (u-l)*(fromIntegral i)/(fromIntegral nPoints)) | i <- [1..nPoints]]
       xsData = transpose xsPoints -- xsData - list of lists of point coordinates
       dataLength = length xsPoints
       vecSize = dataLength * (sizeOf (0 :: CFloat)) -- size of data transmitted to an OpenCL device
@@ -82,8 +96,10 @@ oclPlatformInfo :: [CLPlatformID] -> [IO String]
 oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
 
 
-testFunction = FunctionExpression "Integrate" "x1# + x2# + x3#" ["x1","x2","x3"]
-testString = "Integrate[x1 + x2, {x1, 0, 10}, {x2, 0, 20}]"
+stringToFunction :: String -> Either ParseError FunctionExpression
+stringToFunction inputStr = parse parseIntegrate "Parse error" inputStr
+
+testString = "Integrate[x1# + x2#, {x1, 0, 10}, {x2, 0, 20}]"
 
 -- GOAL: the program should take something like this as an input and produce the result
 testInput = "Integrate[1/(x^3 + 1)/(y^3 + 1), {x, 0, 1}, {y, 0, 1}]"
@@ -93,9 +109,9 @@ testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477
 
 {-
 Next Steps:
-1) Add support for function variable's limits
-2) Implement parser to generate testFunction from a testString(using parser combinator operator <|> )
-3) Match dataPoints generation to function dimensions
+1) Improve parser/genKernel. Get rid of '#' character in testString
+2) Implement sobol sequence(might be unclear) or at least some sequence generator
+3) Modify genKernel to perform integration
 
 Major TODOs:
 1) use function to generate function object from a string
@@ -114,4 +130,6 @@ TODO: Consider following improvements
 7) Monad for function construction
 8) GPipe like function modifiers
 9) Prebuild OpenCL binaries
+10) kernel optimizations. Implement cl_khr_fp64 and read about others
+11) Define a language to use with parser instead of hard-coding parser cases
 -}

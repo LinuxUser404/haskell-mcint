@@ -17,13 +17,13 @@ genKernel expr = "__kernel " ++ "void " ++ (name expr)
                ++ "out[id] = " ++ fexpr ++ ";"
                ++ "}"
   where
-    args   = map ((++) "__global float *") (variables expr) :: [String]
+    args   = map (((++) "__global float *") . fst) (variables $ expr) :: [String]
     outarg = "__global float *out"
-    fexpr = substitute (expression expr) (variables expr) "[id]"
+    fexpr = substitute (expression expr) ( variables expr) "[id]"
     
 
 -- write "[id]" instead of "#"
-substitute :: String -> [String] -> String -> String
+substitute :: String -> [(String, Limits)] -> String -> String
 substitute [] _ _ = []
 substitute ('#':st) vars ids = ids ++ (substitute st vars ids)
 substitute expr vars ids = (takeWhile (/='#') expr) ++ (substitute (dropWhile (/='#') expr) vars ids)
