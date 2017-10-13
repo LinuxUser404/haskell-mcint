@@ -133,4 +133,8 @@ TODO: Consider following improvements
 9) Prebuild OpenCL binaries
 10) kernel optimizations. Implement cl_khr_fp64 and read about others
 11) Define a language to use with parser instead of hard-coding parser cases
+12) Implement OpenCL data types. Data that exists only within an OpenCL device,
+    like vertex and geometry shader instances of Num class in GPipe.
+13) Think about OpenCL IO and other monads to guarantee type safety
+14) Checkout hopencl and OpenCLRAW
 -}
