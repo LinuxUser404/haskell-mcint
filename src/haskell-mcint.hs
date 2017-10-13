@@ -22,11 +22,12 @@ import KernelGen ( genKernel )         -- module that generates OpenCL kernels, 
 import FunctionTypes
 import FunctionParser
 
+-- TODO: consider switching to guards notation
 main :: IO ()
 main = do
   case stringToFunction testString of
-    Left  e -> (hPutStrLn stdout $ show e)
-    Right func -> compute func
+    Left  e -> (hPutStrLn stdout $ show e) -- if parser fails print the error
+    Right func -> compute func             -- otherwise compute compute the input
   return ()
   
 
