@@ -112,6 +112,7 @@ Next Steps:
 1) Improve parser/genKernel. Get rid of '#' character in testString
 2) Implement sobol sequence(might be unclear) or at least some sequence generator
 3) Modify genKernel to perform integration
+4) Use double precision
 
 Major TODOs:
 1) use function to generate function object from a string
