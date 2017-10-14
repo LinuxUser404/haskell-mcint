@@ -36,6 +36,8 @@ http://calgo.acm.org/647.gz -   41 dimensions
 http://calgo.acm.org/659.gz - 1111 dimensions
 http://calgo.acm.org/738.gz -   12 dimensions, MAXBASE=13
 All of them use hard-coded tables of numbers used to generate the sequence.
+http://web.maths.unsw.edu.au/~fkuo/sobol/index.html - S. Joe and F. Y. Kuo provided a table containing direction numbers up to 21001 demensions
+but it is assumed higher dimensions have less impact on the function.
 
 Non-sequential generation can be executed on an accelerator such as a modern GPU, FPGA, Xeon Phi, NVidia Tesla, etc
 For sequential generation numbers l(i) can be efficiently generated independently from g(i) using haskell palindromic list constructor
@@ -43,7 +45,7 @@ Haskell laziness avoids computation of the same sequence multiple times. So it w
 If number of terms is known before computation the computation of the whole sequence will be performed at compile time.
 If it is not known, but there is a reasonable guess haskell allows to specify the number of terms that should be pre-computed at compile time.
 
-Numbers l(i) have a distinct palindromic pattern, so a more efficient way of using them might be a monad(something haskell really likes!). Here is the pattern:
+Numbers l(i) have a distinct palindromic pattern, so a more efficient way of using them might be a monad or a constructor. Here is the pattern:
 1  l()  = [1]
 2  l()  = [1,2,1]
 3  l()  = [1,2,1,3,1,2,1]
@@ -61,7 +63,9 @@ grayCode :: Int -> Int
 grayCode i = xor i $ shift i (-1)
 
 -- "l(i) = 1 + log_2(g(i-1) xor g(i))"
-l i = (+) 1 $ countTrailingZeros $ xor (grayCode (i-1)) (grayCode i)
+-- l i = (+) 1 $ countTrailingZeros $ xor (grayCode (i-1)) (grayCode i)
+ls 0 = []
+ls n = concat [(ls (n-1)),[n],(ls (n-1))]
 
 {-
 q(0,j) = 0
