@@ -57,7 +57,7 @@ compute testFunction = do
   
   -- allocate memory for input data and pass pointers to it to the kernel
   -- fist nD arguments are for input data(see KernelGen.hs)
-  foldr1 (>>) $ fmap (\i -> setKernelInputData context kernel (fromIntegral i) (xsData!!i) vecSize) [0..nD-1]
+  foldr1 (>>) [setKernelInputData context kernel (fromIntegral i) (xsData!!i) vecSize | i <- [0..nD-1]]
 
   -- allocate memory for output data(though we could reuse one of the pointers to the input data instead)
   out <- (mallocArray dataLength) :: IO (Ptr CFloat) -- this pointer is used later to retrieve the data from OpenCL device
@@ -71,7 +71,7 @@ compute testFunction = do
   outputData <- peekArray dataLength out
   
   -- print arrays
-  foldr1 (>>) $ fmap (\i -> (myPrint $ "Input array" ++ (show i) ++ " = " ++ show (xsData!!i))) [0..nD-1]
+  foldr1 (>>) [(myPrint $ "Input array" ++ (show i) ++ " = " ++ show (xsData!!i)) | i <- [0..nD-1]]
   myPrint $ "Output array = " ++ show outputData
   
   return()
