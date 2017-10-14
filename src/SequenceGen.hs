@@ -78,6 +78,7 @@ Direction numbers V have to be generated separately and depend on number of dime
 Sobol supplied a table for these numbers and properties they have to satisfy(so called A and A').
 Unfortunately the numbers satisfying both properties are known maximum for 6 dimensions.
 Numbers satisfying just property A known maximum 16 dimensions.
+Numbers satisfying property A supplied by other authors know up to 21001 dimensions(S. Joe and F. Y. Kuo 2008).
 -}
 
 -- direction numbers V
