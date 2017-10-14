@@ -81,7 +81,7 @@ Numbers satisfying just property A known maximum for 16 dimensions.
 Numbers satisfying property A supplied by other authors known up to 21001 dimensions(S. Joe and F. Y. Kuo 2008).
 -}
 
--- direction numbers V
+-- direction numbers V by Sobol
 --dNV dims n
 dNV 1  n = [1, 1, 1,  1,  1,  1,   1,   1,   1,   1,    1,    1,    1,     1,     1,     1,     1,      1,      1]!!(n-1)
 dNV 2  n = [1, 3, 5, 15, 17, 51,  85, 255, 257, 771, 1285, 3855, 4369, 13107, 21845, 65535, 65537, 196611, 327685]!!(n-1)
