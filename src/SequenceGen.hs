@@ -18,7 +18,7 @@ In short it is done in 3 steps:
 2) For each Gray code number compute the number of the bit that is different from previous Gray code number
    l(i) = 1 + log_2(g(i-1) xor g(i))
    l(i) = [1,2,1,3,1,2,1,4,1,2,..]
-3) Compute Sobol sequence numbers using g(i), l(i) and directional numbers V(i,j)
+3) Compute Sobol sequence numbers using g(i), l(i) and direction numbers V(i,j)
 
 Numbers V(i,j) are not specified in the paper by Antonov and Saleev. Those numbers are described in original Sobol paper:
 Sobol, I. M. (1976) "Uniformly distributed sequences with an additional uniform property". Zh. Vych. Mat. Mat. Fiz. 16: 1332–1337 (in Russian); U.S.S.R. Comput. Maths. Math. Phys. 16: 236–242 (in English).
@@ -56,37 +56,27 @@ import Data.List
 import Data.Bits
 
 
-{-
-Gray code for integer i defined as:
-g(i) = i XOR (i/2)
-with XOR being bit-wise XOR, and '/' integer division, in other words bit shift.
--}
+-- "g(i) = i xor (i div 2)"
 grayCode :: Int -> Int
 grayCode i = xor i $ shift i (-1)
 
-{-
-g(i-1) and g(i) differ in only 1 binary digit!
-l(i) = 1 + log_2(g(i-1) XOR g(i))
--}
+-- "l(i) = 1 + log_2(g(i-1) xor g(i))"
 l i = (+) 1 $ countTrailingZeros $ xor (grayCode (i-1)) (grayCode i)
 
 {-
 q(0,j) = 0
 q(i,j) = q(i-1,j) xor V(l,j)
 q(i,j) - j-th coordinate of i-th number in Sobol sequence
-V(l,j) - j-th coordinate of l-th directional number
+V(l,j) - j-th coordinate of l-th direction number
 l - the number specified above
 
 Direction numbers V have to be generated separately and depend on number of dimensions.
 Sobol supplied a table for these numbers and properties they have to satisfy(so called A and A').
 Unfortunately the numbers satisfying both properties are known maximum for 6 dimensions.
-Numbers satisfying just property A known maximum 16 dimensions. According to the paper it is not known
-where those number exist for any number of dimensions. There is a citation to another paper in which these numbers have
-been found for 51 dimension, but the paper is not available.
-Some other papers (not free) claim they have calculated such numbers up to 1000 dimensions
+Numbers satisfying just property A known maximum 16 dimensions.
 -}
 
--- directional numbers V
+-- direction numbers V
 --dNV dims n
 dNV 1  n = [1, 1, 1,  1,  1,  1,   1,   1,   1,   1,    1,    1,    1,     1,     1,     1,     1,      1,      1]!!(n-1)
 dNV 2  n = [1, 3, 5, 15, 17, 51,  85, 255, 257, 771, 1285, 3855, 4369, 13107, 21845, 65535, 65537, 196611, 327685]!!(n-1)
