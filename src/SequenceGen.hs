@@ -110,11 +110,14 @@ qij 0 _ = 0
 qij i j = xor (qij (i-1) j) (dNV j (l i))
 
 sobolSeq :: Int -> [[Double]]
-sobolSeq d = [fmap (\j -> (fromIntegral (qij i j)) / (iPow2 i)) [1..d] | i <- [1..]]
+sobolSeq d = [fmap (\j -> (fromIntegral $ qij i j) / (fromIntegral $ iPow2 i)) [1..d] | i <- [1..]]
 
 --iPow2 i - smallest power of 2 grater than i 
 --iPow2 i = bit $ ceiling $ logBase 2 i
-iPow2 i = 2
+iPow2 :: Int -> Int
+iPow2 i = head $ filter (> i) powersOf2
+
+powersOf2 = iterate (* 2) 1
 
 --testPi n = (3/4) * (length (filter testInsideASphere (take n (sobolSeq 3)))) / n
 --testInsideASphere [a,b,c] = a*a + b*b + c*c < 1
