@@ -5,7 +5,12 @@ Program: Monte-Carlo integration with OpenCL in Haskell
 -}
 
 {-# LANGUAGE MagicHash #-}
+{-# LANGUAGE BangPatterns #-}
 module SequenceGen where 
+--TODO
+-- add optimization
+-- current performance is too slow...
+
 {-
 This modules implements efficient construction of Sobol sequence following this paper:
 Antonov, I.A. and Saleev, V.M. (1979) "An economic method of computing LPτ-sequences". Zh. Vych. Mat. Mat. Fiz. 19: 243–245 (in Russian); U.S.S.R. Comput. Maths. Math. Phys. 19: 252–256 (in English).
@@ -109,6 +114,7 @@ qij :: Int -> Int -> Int
 qij 0 _ = 0
 qij i j = xor (qij (i-1) j) (dNV j (l i))
 
+
 sobolSeq :: Int -> [[Double]]
 sobolSeq d = [fmap (\j -> (fromIntegral $ qij i j) / (fromIntegral $ iPow2 i)) [1..d] | i <- [1..]]
 
@@ -119,5 +125,9 @@ iPow2 i = head $ filter (> i) powersOf2
 
 powersOf2 = iterate (* 2) 1
 
---testPi n = (3/4) * (length (filter testInsideASphere (take n (sobolSeq 3)))) / n
---testInsideASphere [a,b,c] = a*a + b*b + c*c < 1
+-- Pi is 6 times volume of 1/8 of a unit sphere
+--testPi 2000 = 3.699, takes few seconds
+--testPi 10000 = 3.0822, takes few minutes
+--needs optimization
+testPi n = (6.0) * (fromIntegral . length $ filter testInsideASphere (take n (sobolSeq 3))) / (fromIntegral n)
+testInsideASphere [a,b,c] = a*a + b*b + c*c < 1
