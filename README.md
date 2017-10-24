@@ -1,5 +1,14 @@
 # haskell-mcint
 
+
+You might need to build the dependencies for the program:
+```
+cabal install OpenCL
+cabal install numbers
+cabal install parsec
+cabal install criterion
+```
+
 To build and execute in one command just run:
 
 ```

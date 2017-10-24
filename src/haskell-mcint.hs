@@ -11,6 +11,11 @@ import Data.Number.CReal( showCReal )  -- arbitrary precision real numbers
 import Data.List
 import Text.ParserCombinators.Parsec
 
+-- criterion looks like an overkill for our purposes... CPUTime is what I use instead
+--import Criterion.Measurement -- for measuring performance
+--import Criterion.Main -- benchmarks functions and prints execution statistics(min, max, average, standard deviation, etc)
+import System.CPUTime
+
 
 import Foreign( castPtr, nullPtr, sizeOf )
 import Foreign.Marshal.Array( newArray, peekArray, mallocArray )
@@ -25,9 +30,12 @@ import FunctionParser
 -- TODO: consider switching to guards notation
 main :: IO ()
 main = do
+  start <- getCPUTime
   case stringToFunction testString of
     Left  e -> (hPutStrLn stdout $ show e) -- if parser fails print the error
     Right func -> compute func             -- otherwise compute compute the input
+  end <- getCPUTime
+  hPutStrLn stdout $ "Total computation time: " ++ (show $ (fromIntegral $ end - start) / 10^9)  ++ "ms"
   return ()
   
 
