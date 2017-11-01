@@ -3,23 +3,13 @@
 
 You might need to build the dependencies for the program:
 ```
-cabal install OpenCL
-cabal install numbers
-cabal install parsec
-cabal install criterion
+cabal install
 ```
 
-To build and execute in one command just run:
+To build(without building dependencies) and execute in one command just run:
 
 ```
 cabal run
-```
-
-
-To build the program run:
-
-```
-cabal install
 ```
 
 The executable will be in:
@@ -31,8 +21,8 @@ The executable will be in:
 Tested with:
 
 ```
-ghc-7.10.3
-cabal-1.22.8
+ghc-8.0.2
+cabal-1.24
 haskell-platform-2013.2
-base-4.8.2.0
+base-4.9.1.0
 ```
