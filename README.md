@@ -3,7 +3,12 @@
 
 You might need to build the dependencies for the program:
 ```
+cabal install c2hs
 cabal install
+```
+The program needs external Sobol sequence generator.
+```
+g++ ./src/sobol.cc -o ./src/sobol
 ```
 
 To build(without building dependencies) and execute in one command just run:
