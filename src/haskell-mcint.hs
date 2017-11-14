@@ -39,10 +39,10 @@ main = do
     Right func -> compute func             -- otherwise compute compute the input
   hFlush stdout
   end <- getCPUTime
-  hPutStrLn stdout $ "Total computation time: " ++ (show $ (fromIntegral $ end - start) / 10^9)  ++ "ms"
+  hPutStrLn stdout $ "Total execution time: " ++ (show $ (fromIntegral $ end - start) / 10^9)  ++ "ms"
   return ()
 
-generateSobolSequence :: Int -> Int -> IO [[Float]]
+generateSobolSequence :: Int -> Int -> IO [[CFloat]]
 generateSobolSequence n d = do
   -- initialize sobol sequence generator(external program that uses pre-calculated direction numbers)
   (_, Just hout, _, _) <- createProcess (proc "./src/sobol" [show n,show d,"./src/direction_numbers-joe-kuo-6.21201"]){std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe}
@@ -50,7 +50,7 @@ generateSobolSequence n d = do
   return (toDataList sobolStr)
     where
       -- drop last symbol(extra new line...), divide output into lines, each line divide into words, and convert each word into Float
-      toDataList = (map $ map (read :: String -> Float)) . (map words) . lines . init
+      toDataList = (map $ map (read :: String -> CFloat)) . (map words) . lines . init
 
 
 
@@ -76,9 +76,15 @@ compute testFunction = do
   clBuildProgram program [device] "" -- compiles the program without any specific optimization options ""
   kernel <- clCreateKernel program functionName -- function name in the source
   
+  -- generate Sobol sequence data points
+  xsPoints <- generateSobolSequence numOfPoints nD
+  let xsData = transpose xsPoints
+
   -- allocate memory for input data and pass pointers to it to the kernel
   -- fist nD arguments are for input data(see KernelGen.hs)
+  genStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
   foldr1 (>>) [setKernelInputData context kernel (fromIntegral i) (xsData!!i) vecSize | i <- [0..nD-1]]
+  genEnd <- getCPUTime
 
   -- allocate memory for output data(though we could reuse one of the pointers to the input data instead)
   out <- (mallocArray dataLength) :: IO (Ptr CFloat) -- this pointer is used later to retrieve the data from OpenCL device
@@ -86,26 +92,33 @@ compute testFunction = do
   clSetKernelArgSto kernel (fromIntegral nD) mem_out  -- kernel's last agrument is the output(see KernelGen.hs)
   
   -- create command queue and queue the execution on a device
+  execStart <- getCPUTime
   q <- clCreateCommandQueue context device [] -- creates command queue with default properties []
   eventExec <- clEnqueueNDRangeKernel q kernel [dataLength] [] []  -- queue the execution
   eventRead <- clEnqueueReadBuffer q mem_out True 0 vecSize (castPtr out) [eventExec] -- read the result once execution is complete
   outputData <- peekArray dataLength out
+  execEnd <- getCPUTime
   
   -- print arrays
-  foldr1 (>>) [(myPrint $ "Input array" ++ (show i) ++ " = " ++ show (xsData!!i)) | i <- [0..nD-1]]
-  myPrint $ "Output array = " ++ show outputData
+  --foldr1 (>>) [(myPrint $ "Input array" ++ (show i) ++ " = " ++ show (xsData!!i)) | i <- [0..nD-1]]
+  --myPrint $ "Output array = " ++ show outputData
+  
+  -- calculate the sum of the output array, divide by number of points and print the result
+  myPrint $ (++) (testString ++ " = ") $ show $ (foldl1' (+) outputData) / (fromIntegral numOfPoints)
+  myPrint $ "Sequence generation time: " ++ (show $ (fromIntegral $ genEnd - genStart) / 10^9)  ++ "ms"
+  myPrint $ "OCL execution and IO time: " ++ (show $ (fromIntegral $ execEnd - execStart) / 10^9)  ++ "ms"
   
   return()
     where
       platformNumber = 0  -- using the first platform
-      numOfPoint = 10
+      numOfPoints = 1000000
       -- dementions of input data(length xsData) and the function(nD) should be equal!
       nD = length $ variables testFunction -- number of dimensions
-      xsPoints = transpose $ fmap ((gen1Dsec numOfPoint) . snd) $ variables testFunction -- xsPoints - list of points
+      --xsPoints = transpose $ fmap ((gen1Dsec numOfPoints) . snd) $ variables testFunction -- xsPoints - list of points
       gen1Dsec :: Int -> Limits -> [CFloat]
       gen1Dsec nPoints (Limits l u) = [(l + (u-l)*(fromIntegral i)/(fromIntegral nPoints)) | i <- [1..nPoints]]
-      xsData = transpose xsPoints -- xsData - list of lists of point coordinates
-      dataLength = length xsPoints
+      --xsData = transpose xsPoints -- xsData - list of lists of point coordinates
+      dataLength = numOfPoints
       vecSize = dataLength * (sizeOf (0 :: CFloat)) -- size of data transmitted to an OpenCL device
       clText = genKernel testFunction
       functionName = name testFunction
@@ -121,7 +134,7 @@ oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
 stringToFunction :: String -> Either ParseError FunctionExpression
 stringToFunction inputStr = parse parseIntegrate "Parse error" inputStr
 
-testString = "Integrate[x1# + x2#, {x1, 0, 10}, {x2, 0, 20}]"
+testString = "Integrate[1/(x1#*x1#*x1# + 1)/(x2#*x2#*x2# + 1), {x1, 0, 1}, {x2, 0, 1}]"
 
 -- GOAL: the program should take something like this as an input and produce the result
 testInput = "Integrate[1/(x^3 + 1)/(y^3 + 1), {x, 0, 1}, {y, 0, 1}]"
