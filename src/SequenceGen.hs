@@ -2,6 +2,8 @@
 Author: Nick(Mykola) Pershyn
 Language: Haskell
 Program: Monte-Carlo integration with OpenCL in Haskell
+this module is not used
+The program uses external solution (S. Joe and F. Y. Kuo 2008) sobol.cc for Sobol sequence generation
 -}
 
 {-# LANGUAGE MagicHash #-}
