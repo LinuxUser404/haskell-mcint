@@ -10,15 +10,16 @@ import Data.List(intercalate)
 import FunctionTypes
 
 genKernel :: FunctionExpression -> String
-genKernel expr = "__kernel " ++ "void " ++ (name expr)
+genKernel expr = "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n"
+               ++ "__kernel " ++ "void " ++ (name expr)
                ++ "(" ++ (intercalate ", " (args ++ outarg:[]) ) ++ ")"
                ++ "{"
                ++ "int id = get_global_id(0);"
                ++ "out[id] = " ++ fexpr ++ ";"
                ++ "}"
   where
-    args   = map (((++) "__global float *") . fst) (variables $ expr) :: [String]
-    outarg = "__global float *out"
+    args   = map (((++) "__global double *") . fst) (variables $ expr) :: [String]
+    outarg = "__global double *out"
     fexpr = substitute (expression expr) ( variables expr) "[id]"
     
 

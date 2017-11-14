@@ -5,7 +5,7 @@ Program: Monte-Carlo integration with OpenCL in Haskell
 -}
 module FunctionTypes (FunctionExpression(..),Limits(..)) where 
 
-import Foreign.C.Types( CFloat )
+import Foreign.C.Types( CDouble )
 
 {-
 data IntegrateFunction = IntegrateFunction {
@@ -20,6 +20,6 @@ data FunctionExpression = FunctionExpression {
 } deriving Eq
 
 data Limits = Limits {
-  lower :: CFloat,
-  upper :: CFloat
+  lower :: CDouble,
+  upper :: CDouble
 } deriving Eq

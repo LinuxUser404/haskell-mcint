@@ -19,7 +19,7 @@ import System.CPUTime
 
 import Foreign( castPtr, nullPtr, sizeOf )
 import Foreign.Marshal.Array( newArray, peekArray, mallocArray )
-import Foreign.C.Types( CFloat )
+import Foreign.C.Types( CDouble )
 import Foreign.Ptr( Ptr )
 
 import System.Process -- to run external program
@@ -42,7 +42,7 @@ main = do
   hPutStrLn stdout $ "Total execution time: " ++ (show $ (fromIntegral $ end - start) / 10^9)  ++ "ms"
   return ()
 
-generateSobolSequence :: Int -> Int -> IO [[CFloat]]
+generateSobolSequence :: Int -> Int -> IO [[CDouble]]
 generateSobolSequence n d = do
   -- initialize sobol sequence generator(external program that uses pre-calculated direction numbers)
   (_, Just hout, _, _) <- createProcess (proc "./src/sobol" [show n,show d,"./src/direction_numbers-joe-kuo-6.21201"]){std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe}
@@ -50,7 +50,7 @@ generateSobolSequence n d = do
   return (toDataList sobolStr)
     where
       -- drop last symbol(extra new line...), divide output into lines, each line divide into words, and convert each word into Float
-      toDataList = (map $ map (read :: String -> CFloat)) . (map words) . lines . init
+      toDataList = (map $ map (read :: String -> CDouble)) . (map words) . lines . init -- this is probably taking too much time and space
 
 
 
@@ -87,7 +87,7 @@ compute testFunction = do
   genEnd <- getCPUTime
 
   -- allocate memory for output data(though we could reuse one of the pointers to the input data instead)
-  out <- (mallocArray dataLength) :: IO (Ptr CFloat) -- this pointer is used later to retrieve the data from OpenCL device
+  out <- (mallocArray dataLength) :: IO (Ptr CDouble) -- this pointer is used later to retrieve the data from OpenCL device
   mem_out <- clCreateBuffer context [CL_MEM_WRITE_ONLY] (vecSize, nullPtr)
   clSetKernelArgSto kernel (fromIntegral nD) mem_out  -- kernel's last agrument is the output(see KernelGen.hs)
   
@@ -111,15 +111,15 @@ compute testFunction = do
   return()
     where
       platformNumber = 0  -- using the first platform
-      numOfPoints = 1000000
+      numOfPoints = 2^20
       -- dementions of input data(length xsData) and the function(nD) should be equal!
       nD = length $ variables testFunction -- number of dimensions
       --xsPoints = transpose $ fmap ((gen1Dsec numOfPoints) . snd) $ variables testFunction -- xsPoints - list of points
-      gen1Dsec :: Int -> Limits -> [CFloat]
+      gen1Dsec :: Int -> Limits -> [CDouble]
       gen1Dsec nPoints (Limits l u) = [(l + (u-l)*(fromIntegral i)/(fromIntegral nPoints)) | i <- [1..nPoints]]
       --xsData = transpose xsPoints -- xsData - list of lists of point coordinates
       dataLength = numOfPoints
-      vecSize = dataLength * (sizeOf (0 :: CFloat)) -- size of data transmitted to an OpenCL device
+      vecSize = dataLength * (sizeOf (0 :: CDouble)) -- size of data transmitted to an OpenCL device
       clText = genKernel testFunction
       functionName = name testFunction
       myPrint = hPutStrLn stdout -- prints to stdout, can be easily modified to print to a file or a port
