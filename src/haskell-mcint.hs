@@ -22,6 +22,9 @@ import Foreign.Marshal.Array( newArray, peekArray, mallocArray )
 import Foreign.C.Types( CFloat )
 import Foreign.Ptr( Ptr )
 
+import System.Process -- to run external program
+import System.Environment
+import System.Exit
 
 import KernelGen ( genKernel )         -- module that generates OpenCL kernels, aka content of a .cl file
 import FunctionTypes
@@ -34,10 +37,20 @@ main = do
   case stringToFunction testString of
     Left  e -> (hPutStrLn stdout $ show e) -- if parser fails print the error
     Right func -> compute func             -- otherwise compute compute the input
+  hFlush stdout
   end <- getCPUTime
   hPutStrLn stdout $ "Total computation time: " ++ (show $ (fromIntegral $ end - start) / 10^9)  ++ "ms"
   return ()
-  
+
+generateSobolSequence :: Int -> Int -> IO [[Float]]
+generateSobolSequence n d = do
+  -- initialize sobol sequence generator(external program that uses pre-calculated direction numbers)
+  (_, Just hout, _, _) <- createProcess (proc "./src/sobol" [show n,show d,"./src/direction_numbers-joe-kuo-6.21201"]){std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe}
+  sobolStr <- hGetContents hout
+  return (toDataList sobolStr)
+    where
+      -- drop last symbol(extra new line...), divide output into lines, each line divide into words, and convert each word into Float
+      toDataList = (map $ map (read :: String -> Float)) . (map words) . lines . init
 
 
 
@@ -48,7 +61,7 @@ compute testFunction = do
   myPrint $ "There are " ++ ((show . length) (platforms)) ++ " OpenCL platforms."
   vendor  <- ((oclPlatformInfo platforms) !! platformNumber)
   myPrint $ "Selected platform: [" ++ (show platformNumber) ++ "]" ++ vendor
-  device <- head `fmap` clGetDeviceIDs (platforms!!platformNumber) CL_DEVICE_TYPE_GPU -- possible options: CPU, GPU, ALL, DEFAULT, ACCELERATOR
+  device <- head `fmap` clGetDeviceIDs (platforms!!platformNumber) CL_DEVICE_TYPE_DEFAULT -- possible options: CPU, GPU, ALL, DEFAULT, ACCELERATOR
   deviceName <- clGetDeviceName device
   myPrint $ "Selected device: " ++ deviceName -- in my case Quadro K4200
   
@@ -145,5 +158,18 @@ TODO: Consider following improvements
 12) Implement OpenCL data types. Data that exists only within an OpenCL device,
     like vertex and geometry shader instances of Num class in GPipe.
 13) Think about OpenCL IO and other monads to guarantee type safety
-14) Checkout hopencl and OpenCLRAW
+14) Revisit GPipe project for inspiration
+15) Checkout accelerate(array operations on GPU)
+16) Checkout shady-gen(another project for execution on GPU)
+
+-}
+
+
+{- Some choices
+1) HOpenCL is not in a useful state (that package itself fails the tests)
+2) OpenCLRAW seems to be too low level compared to OpenCL
+3) No need for Criterion library. Basic metrics can be checked via prelude
+   and on per function basis
+4) 
+
 -}

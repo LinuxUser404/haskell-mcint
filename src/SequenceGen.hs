@@ -113,6 +113,7 @@ dNV 16 n = [1, 1, 3, 13, 11,  7,  37, 101, 463,  657, 1599,  347,  2481,  5201, 
 qij :: Int -> Int -> Int
 qij 0 _ = 0
 qij i j = xor (qij (i-1) j) (dNV j (l i))
+-- use iterate instead
 
 
 sobolSeq :: Int -> [[Double]]
