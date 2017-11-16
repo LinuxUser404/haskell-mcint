@@ -3,7 +3,8 @@ Author: Nick(Mykola) Pershyn
 Language: Haskell
 Program: Monte-Carlo integration with OpenCL in Haskell
 -}
-module Main where
+--module Main where
+{-# LANGUAGE BangPatterns, MagicHash #-}
 
 import System.IO
 import Control.Parallel.OpenCL
@@ -11,22 +12,24 @@ import Data.Number.CReal( showCReal )  -- arbitrary precision real numbers
 import Data.List
 import Text.ParserCombinators.Parsec
 
+--import qualified Data.ByteString.Lazy.Char8      as L
+--import qualified Data.ByteString.Lazy as L -- readDouble
+import qualified Data.Vector{-.Unboxed-} as V -- vectors for performance
+
 -- criterion looks like an overkill for our purposes... CPUTime is what I use instead
 --import Criterion.Measurement -- for measuring performance
 --import Criterion.Main -- benchmarks functions and prints execution statistics(min, max, average, standard deviation, etc)
 import System.CPUTime
 
+import GHC.Prim
 
 import Foreign( castPtr, nullPtr, sizeOf )
 import Foreign.Marshal.Array( newArray, peekArray, mallocArray )
-import Foreign.C.Types( CDouble )
 import Foreign.Ptr( Ptr )
 
-import System.Process -- to run external program
-import System.Environment
-import System.Exit
+import System.Process( createProcess, std_err, std_in, std_out, StdStream( CreatePipe ), proc ) -- to run external program
 
-import KernelGen ( genKernel )         -- module that generates OpenCL kernels, aka content of a .cl file
+import KernelGen( genKernel )         -- module that generates OpenCL kernels, aka content of a .cl file
 import FunctionTypes
 import FunctionParser
 
@@ -42,17 +45,19 @@ main = do
   hPutStrLn stdout $ "Total execution time: " ++ (show $ (fromIntegral $ end - start) / 10^9)  ++ "ms"
   return ()
 
-generateSobolSequence :: Int -> Int -> IO [[CDouble]]
+generateSobolSequence :: Int -> Int -> IO (V.Vector (V.Vector Double))
 generateSobolSequence n d = do
   -- initialize sobol sequence generator(external program that uses pre-calculated direction numbers)
   (_, Just hout, _, _) <- createProcess (proc "./src/sobol" [show n,show d,"./src/direction_numbers-joe-kuo-6.21201"]){std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe}
   sobolStr <- hGetContents hout
-  return (toDataList sobolStr)
-    where
-      -- drop last symbol(extra new line...), divide output into lines, each line divide into words, and convert each word into Float
-      toDataList = (map $ map (read :: String -> CDouble)) . (map words) . lines . init -- this is probably taking too much time and space
+  return ((stringToListOfPoints n d) sobolStr)
 
+strToDouble :: String -> Double
+strToDouble = read
 
+stringToListOfPoints :: Int -> Int -> String -> (V.Vector (V.Vector Double))
+stringToListOfPoints n d s = (V.fromListN n) . (map $ (V.fromListN d) . (map strToDouble) . words) . lines $ s
+-- (map $ (V.fromList) . (V.slice 0 d) . (map (read :: String -> CDouble))) . (map words) . (V.fromList) . lines
 
 compute :: FunctionExpression -> IO ()
 compute testFunction = do
@@ -77,8 +82,8 @@ compute testFunction = do
   kernel <- clCreateKernel program functionName -- function name in the source
   
   -- generate Sobol sequence data points
-  xsPoints <- generateSobolSequence numOfPoints nD
-  let xsData = transpose xsPoints
+  !xsPoints <- generateSobolSequence numOfPoints nD
+  let !xsData = transpose ((map V.toList) (V.toList xsPoints))
 
   -- allocate memory for input data and pass pointers to it to the kernel
   -- fist nD arguments are for input data(see KernelGen.hs)
@@ -87,7 +92,7 @@ compute testFunction = do
   genEnd <- getCPUTime
 
   -- allocate memory for output data(though we could reuse one of the pointers to the input data instead)
-  out <- (mallocArray dataLength) :: IO (Ptr CDouble) -- this pointer is used later to retrieve the data from OpenCL device
+  out <- (mallocArray dataLength) :: IO (Ptr Double) -- this pointer is used later to retrieve the data from OpenCL device
   mem_out <- clCreateBuffer context [CL_MEM_WRITE_ONLY] (vecSize, nullPtr)
   clSetKernelArgSto kernel (fromIntegral nD) mem_out  -- kernel's last agrument is the output(see KernelGen.hs)
   
@@ -110,16 +115,14 @@ compute testFunction = do
   
   return()
     where
-      platformNumber = 0  -- using the first platform
-      numOfPoints = 2^20
+      platformNumber = 0 :: Int  -- using the first platform
+      numOfPoints = (2^20 :: Int)
       -- dementions of input data(length xsData) and the function(nD) should be equal!
       nD = length $ variables testFunction -- number of dimensions
       --xsPoints = transpose $ fmap ((gen1Dsec numOfPoints) . snd) $ variables testFunction -- xsPoints - list of points
-      gen1Dsec :: Int -> Limits -> [CDouble]
-      gen1Dsec nPoints (Limits l u) = [(l + (u-l)*(fromIntegral i)/(fromIntegral nPoints)) | i <- [1..nPoints]]
       --xsData = transpose xsPoints -- xsData - list of lists of point coordinates
       dataLength = numOfPoints
-      vecSize = dataLength * (sizeOf (0 :: CDouble)) -- size of data transmitted to an OpenCL device
+      vecSize = dataLength * (sizeOf (undefined :: Double)) -- size of data transmitted to an OpenCL device
       clText = genKernel testFunction
       functionName = name testFunction
       myPrint = hPutStrLn stdout -- prints to stdout, can be easily modified to print to a file or a port
@@ -134,11 +137,15 @@ oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
 stringToFunction :: String -> Either ParseError FunctionExpression
 stringToFunction inputStr = parse parseIntegrate "Parse error" inputStr
 
+testString :: String
 testString = "Integrate[1/(x1#*x1#*x1# + 1)/(x2#*x2#*x2# + 1), {x1, 0, 1}, {x2, 0, 1}]"
 
 -- GOAL: the program should take something like this as an input and produce the result
+testInput :: String
 testInput = "Integrate[1/(x^3 + 1)/(y^3 + 1), {x, 0, 1}, {y, 0, 1}]"
+testNumOutput :: String
 testNumOutput = showCReal 100 $ ((1/18) * (2 * sqrt(3) * pi + log(64))) ** 2 -- the exact number with 100 digits precision
+testOutPut :: String
 testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477469051938999891540922414594979416232" -- the value of testNumOutput
 
 
