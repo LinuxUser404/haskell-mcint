@@ -82,14 +82,16 @@ compute testFunction = do
   kernel <- clCreateKernel program functionName -- function name in the source
   
   -- generate Sobol sequence data points
+  genStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
   !xsPoints <- generateSobolSequence numOfPoints nD
-  let !xsData = transpose ((map V.toList) (V.toList xsPoints))
+  genEnd <- getCPUTime
+  let xsData = transpose ((map V.toList) (V.toList xsPoints))
 
   -- allocate memory for input data and pass pointers to it to the kernel
   -- fist nD arguments are for input data(see KernelGen.hs)
-  genStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
+  transStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
   foldr1 (>>) [setKernelInputData context kernel (fromIntegral i) (xsData!!i) vecSize | i <- [0..nD-1]]
-  genEnd <- getCPUTime
+  transEnd <- getCPUTime
 
   -- allocate memory for output data(though we could reuse one of the pointers to the input data instead)
   out <- (mallocArray dataLength) :: IO (Ptr Double) -- this pointer is used later to retrieve the data from OpenCL device
@@ -111,6 +113,7 @@ compute testFunction = do
   -- calculate the sum of the output array, divide by number of points and print the result
   myPrint $ (++) (testString ++ " = ") $ show $ (foldl1' (+) outputData) / (fromIntegral numOfPoints)
   myPrint $ "Sequence generation time: " ++ (show $ (fromIntegral $ genEnd - genStart) / 10^9)  ++ "ms"
+  myPrint $ "Sequence transposition time: " ++ (show $ (fromIntegral $ transEnd - transStart) / 10^9)  ++ "ms"
   myPrint $ "OCL execution and IO time: " ++ (show $ (fromIntegral $ execEnd - execStart) / 10^9)  ++ "ms"
   
   return()
