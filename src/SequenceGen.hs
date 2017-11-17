@@ -77,15 +77,14 @@ grayCode :: Int -> Int
 grayCode !i = xor i $ shift i (-1)
 
 genSobolSec :: Int -> Int -> (U.Vector Double)
-genSobolSec !n !d = (U.fromList) . concat $ (take n) (sobolSeq d)
+genSobolSec !n !d = (U.fromList) . (concat . (map U.toList)) $ (take n) (sobolSeq d)
 
 
 
 -- "l(i) = 1 + log_2(g(i-1) xor g(i))"
 l :: Int -> Int
 l !i = (+) 1 $ countTrailingZeros $ xor (grayCode (i-1)) (grayCode i)
---ls 0 = []
---ls n = concat [(ls (n-1)),[n],(ls (n-1))]
+
 
 {-
 q(0,j) = 0
@@ -147,14 +146,16 @@ dNV 16 n = [1, 1, 3, 13, 11,  7,  37, 101, 463,  657, 1599,  347,  2481,  5201, 
 --sobolSequence
 -- qij - j-th coordinate of i-th number in Sobol squence
 qij :: Int -> Int -> Int
-qij !i !j = (U.!) (q_data!!i) (j-1)
+qij i j = (U.!) (q_data!!i) (j-1)
 q_data :: [U.Vector Int]
 q_data = map snd $ (iterate f) (0, (U.fromList) (replicate 16 0))
   where
     f (i, v) = (i + 1, U.fromList (map (\j -> xor ((U.!) v (j-1)) (dNV j (l (i+1)))) [1..16] ))
 
-sobolSeq :: Int -> [[Double]]
-sobolSeq d = [fmap (\j -> (fromIntegral $ qij i j) / (fromIntegral $ iPow2 i)) [1..d] | i <- [1..]]
+sobolSeq :: Int -> [U.Vector Double]
+sobolSeq d = map (U.fromList) [fmap (\j -> theQ i j) [1..d] | i <- [1..]]
+  where
+    theQ i j = (fromIntegral $ qij i j) / (fromIntegral $ iPow2 i)
 
 --iPow2 i - smallest power of 2 grater than i 
 --iPow2 i = bit $ ceiling $ logBase 2 i
@@ -165,7 +166,12 @@ powersOf2 = iterate (* 2) 1
 
 -- Pi is 6 times volume of 1/8 of a unit sphere
 --testPi 2000 = 3.699, takes few seconds
---testPi 10000 = 3.0822, takes few minutes
---needs optimization
-testPi n = (6.0) * (fromIntegral . length $ filter testInsideASphere (take n (sobolSeq 3))) / (fromIntegral n)
-testInsideASphere [a,b,c] = a*a + b*b + c*c < 1
+--testPi 10000 = 3.0822, takes few seconds
+--testPi 50000 = 1.90428, wtf?
+testPi :: Int -> Double
+testPi !n = (6.0) * (fromIntegral . length $ filter testInsideASphere (take n (sobolSeq 3))) / (fromIntegral n)
+testInsideASphere !v = ((a*a + b*b + c*c) < 1.0)
+  where
+    !a = U.unsafeIndex v 0
+    !b = U.unsafeIndex v 1
+    !c = U.unsafeIndex v 2
