@@ -8,7 +8,7 @@ The program uses external solution (S. Joe and F. Y. Kuo 2008) sobol.cc for Sobo
 
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE BangPatterns #-}
-module SequenceGen where 
+module SequenceGen ( genSobolSec ) where 
 --TODO
 -- add optimization
 -- current performance is too slow...
@@ -67,13 +67,23 @@ import GHC.Integer.Logarithms
 import Data.List
 import Data.Bits
 
+import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as U -- vectors for performance
+import qualified Data.Vector.Storable as S -- vectors for performance
+
 
 -- "g(i) = i xor (i div 2)"
 grayCode :: Int -> Int
-grayCode i = xor i $ shift i (-1)
+grayCode !i = xor i $ shift i (-1)
+
+genSobolSec :: Int -> Int -> (U.Vector Double)
+genSobolSec !n !d = (U.fromList) . concat $ (take n) (sobolSeq d)
+
+
 
 -- "l(i) = 1 + log_2(g(i-1) xor g(i))"
-l i = (+) 1 $ countTrailingZeros $ xor (grayCode (i-1)) (grayCode i)
+l :: Int -> Int
+l !i = (+) 1 $ countTrailingZeros $ xor (grayCode (i-1)) (grayCode i)
 --ls 0 = []
 --ls n = concat [(ls (n-1)),[n],(ls (n-1))]
 
@@ -93,6 +103,28 @@ Numbers satisfying property A supplied by other authors known up to 21001 dimens
 
 -- direction numbers V by Sobol
 --dNV dims n
+dNV d n = (U.!) dNV_data ((d - 1) * dNV_MAXN + n - 1)
+dNV_DIM = 16
+dNV_MAXN = 19
+dNV_data :: (U.Vector Int)
+dNV_data = U.fromList
+  [1, 1, 1,  1,  1,  1,   1,   1,   1,    1,    1,    1,     1,     1,     1,     1,      1,      1,      1,
+   1, 3, 5, 15, 17, 51,  85, 255, 257,  771, 1285, 3855,  4369, 13107, 21845, 65535,  65537, 196611, 327685,
+   1, 1, 7, 11, 13, 61,  67,  79, 465,  721,  823, 4091,  4125,  4141, 28723, 45311,  53505, 250113, 276231,
+   1, 3, 7,  5,  7, 43,  49, 147, 439, 1013,  727,  987,  5889,  6915, 16647, 49925, 116487,  83243, 116529,
+   1, 1, 5,  3, 15, 51, 125, 141, 177,  759,  267, 1839,  6929, 16241, 16565, 17139,  82207,  50979, 252717,
+   1, 3, 1,  1,  9, 59,  25,  89, 321,  835,  833, 4033,  3913, 11643, 18777, 35225, 102401,  45059,  36865,
+   1, 1, 3,  7, 31, 47, 109, 173, 181,  949,  471, 2515,  6211,  2147,  3169, 35873,  33841,  99889, 247315,
+   1, 3, 3,  9,  9, 57,  43,  43, 225,  113, 1601,  579,  1731, 11977,  7241, 63609,  81003,  15595, 144417,
+   1, 3, 7, 13,  3, 35,  89,   9, 235,  929, 1341, 3863,  1347,  4417,  5087, 12631, 103445, 152645, 130127,
+   1, 1, 5, 11, 27, 53,  69,  25, 103,  615,  913,  977,  6197, 14651,  2507, 27109,   5205,  91369, 302231,
+   1, 3, 5,  1, 15, 19, 113, 115, 411,  157, 1725, 3463,  2817,  9997,  7451, 12055,  44877,  24895, 508255,
+   1, 1, 7,  3, 29, 51,  47,  97, 233,   39, 2021, 2909,  5459,  2615, 13329, 35887,  97323,  83101, 320901,
+   1, 3, 7,  7, 21, 61,  55,  19,  59,  761, 1905, 3379,  8119, 13207,  8965,  9997,  75591, 226659, 187499,
+   1, 1, 1,  9, 23, 37,  97,  97, 353,  169,  375, 1349,  5121, 13313, 19457,  1033,  62487, 250917, 234593,
+   1, 3, 3,  5, 19, 33,   3, 197, 329,  983,  893, 3739,  7669,  2671, 18391, 31161,  12111, 259781,  36159,
+   1, 1, 3, 13, 11,  7,  37, 101, 463,  657, 1599,  347,  2481,  5201,  3123, 32253,  78043,  63447, 508757]
+{-
 dNV 1  n = [1, 1, 1,  1,  1,  1,   1,   1,   1,    1,    1,    1,     1,     1,     1,     1,      1,      1,      1]!!(n-1)
 dNV 2  n = [1, 3, 5, 15, 17, 51,  85, 255, 257,  771, 1285, 3855,  4369, 13107, 21845, 65535,  65537, 196611, 327685]!!(n-1)
 dNV 3  n = [1, 1, 7, 11, 13, 61,  67,  79, 465,  721,  823, 4091,  4125,  4141, 28723, 45311,  53505, 250113, 276231]!!(n-1)
@@ -109,14 +141,17 @@ dNV 13 n = [1, 3, 7,  7, 21, 61,  55,  19,  59,  761, 1905, 3379,  8119, 13207, 
 dNV 14 n = [1, 1, 1,  9, 23, 37,  97,  97, 353,  169,  375, 1349,  5121, 13313, 19457,  1033,  62487, 250917, 234593]!!(n-1)
 dNV 15 n = [1, 3, 3,  5, 19, 33,   3, 197, 329,  983,  893, 3739,  7669,  2671, 18391, 31161,  12111, 259781,  36159]!!(n-1)
 dNV 16 n = [1, 1, 3, 13, 11,  7,  37, 101, 463,  657, 1599,  347,  2481,  5201,  3123, 32253,  78043,  63447, 508757]!!(n-1)
+-}
+
 
 --sobolSequence
--- qij - j-th coordinate of i-th number is Sobot squence
+-- qij - j-th coordinate of i-th number in Sobol squence
 qij :: Int -> Int -> Int
-qij 0 _ = 0
-qij i j = xor (qij (i-1) j) (dNV j (l i))
--- use iterate instead
-
+qij !i !j = (U.!) (q_data!!i) (j-1)
+q_data :: [U.Vector Int]
+q_data = map snd $ (iterate f) (0, (U.fromList) (replicate 16 0))
+  where
+    f (i, v) = (i + 1, U.fromList (map (\j -> xor ((U.!) v (j-1)) (dNV j (l (i+1)))) [1..16] ))
 
 sobolSeq :: Int -> [[Double]]
 sobolSeq d = [fmap (\j -> (fromIntegral $ qij i j) / (fromIntegral $ iPow2 i)) [1..d] | i <- [1..]]
