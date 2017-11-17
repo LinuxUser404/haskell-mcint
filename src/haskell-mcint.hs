@@ -4,7 +4,8 @@ Language: Haskell
 Program: Monte-Carlo integration with OpenCL in Haskell
 -}
 --module Main where
-{-# LANGUAGE BangPatterns, MagicHash #-}
+{-# LANGUAGE BangPatterns #-}
+-- {-# MagicHash #-} -- for using unboxed
 
 import System.IO
 import Control.Parallel.OpenCL
@@ -14,7 +15,9 @@ import Text.ParserCombinators.Parsec
 
 --import qualified Data.ByteString.Lazy.Char8      as L
 --import qualified Data.ByteString.Lazy as L -- readDouble
-import qualified Data.Vector{-.Unboxed-} as V -- vectors for performance
+import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as U -- vectors for performance
+import qualified Data.Vector.Storable as S -- vectors for performance
 
 -- criterion looks like an overkill for our purposes... CPUTime is what I use instead
 --import Criterion.Measurement -- for measuring performance
@@ -45,19 +48,21 @@ main = do
   hPutStrLn stdout $ "Total execution time: " ++ (show $ (fromIntegral $ end - start) / 10^9)  ++ "ms"
   return ()
 
-generateSobolSequence :: Int -> Int -> IO (V.Vector (V.Vector Double))
+generateSobolSequence :: Int -> Int -> IO (U.Vector Double)
 generateSobolSequence n d = do
   -- initialize sobol sequence generator(external program that uses pre-calculated direction numbers)
   (_, Just hout, _, _) <- createProcess (proc "./src/sobol" [show n,show d,"./src/direction_numbers-joe-kuo-6.21201"]){std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe}
   sobolStr <- hGetContents hout
-  return ((stringToListOfPoints n d) sobolStr)
+  return ((mystringToListOfPoints n d) sobolStr)
 
 strToDouble :: String -> Double
-strToDouble = read
+strToDouble !s = read s
 
-stringToListOfPoints :: Int -> Int -> String -> (V.Vector (V.Vector Double))
-stringToListOfPoints n d s = (V.fromListN n) . (map $ (V.fromListN d) . (map strToDouble) . words) . lines $ s
--- (map $ (V.fromList) . (V.slice 0 d) . (map (read :: String -> CDouble))) . (map words) . (V.fromList) . lines
+mystringToListOfPoints :: Int -> Int -> String -> (U.Vector Double)
+mystringToListOfPoints !n !d s = (U.fromListN (n * d)) . (map strToDouble) . words $ s
+
+myTranspose :: Int -> Int -> (U.Vector Double) -> [[Double]]
+myTranspose !n !d !v = map (\i -> (map (\j -> U.unsafeIndex v ((j-1)*d + i-1) ) [1..n] )) [1..d]
 
 compute :: FunctionExpression -> IO ()
 compute testFunction = do
@@ -85,7 +90,7 @@ compute testFunction = do
   genStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
   !xsPoints <- generateSobolSequence numOfPoints nD
   genEnd <- getCPUTime
-  let xsData = transpose ((map V.toList) (V.toList xsPoints))
+  let xsData = myTranspose numOfPoints nD xsPoints
 
   -- allocate memory for input data and pass pointers to it to the kernel
   -- fist nD arguments are for input data(see KernelGen.hs)
