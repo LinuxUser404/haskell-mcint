@@ -5,7 +5,7 @@ Program: Monte-Carlo integration with OpenCL in Haskell
 -}
 --module Main where
 {-# LANGUAGE BangPatterns #-}
--- {-# MagicHash #-} -- for using unboxed
+-- {-# MagicHash #-} -- for using raw unboxed types
 
 import System.IO
 import Control.Parallel.OpenCL
@@ -13,8 +13,6 @@ import Data.Number.CReal( showCReal )  -- arbitrary precision real numbers
 import Data.List
 import Text.ParserCombinators.Parsec
 
---import qualified Data.ByteString.Lazy.Char8      as L
---import qualified Data.ByteString.Lazy as L -- readDouble
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as U -- vectors for performance
 import qualified Data.Vector.Storable as S -- vectors for performance
@@ -24,7 +22,7 @@ import qualified Data.Vector.Storable as S -- vectors for performance
 --import Criterion.Main -- benchmarks functions and prints execution statistics(min, max, average, standard deviation, etc)
 import System.CPUTime
 
-import GHC.Prim
+--import GHC.Prim -- raw unboxed types
 
 import Foreign( castPtr, nullPtr, sizeOf )
 import Foreign.Marshal.Array( newArray, peekArray, mallocArray )
@@ -116,7 +114,8 @@ compute testFunction = do
   --myPrint $ "Output array = " ++ show outputData
   
   -- calculate the sum of the output array, divide by number of points and print the result
-  myPrint $ (++) (testString ++ " = ") $ show $ (foldl1' (+) outputData) / (fromIntegral numOfPoints)
+--  myPrint $ (++) (testString ++ " = ") $ show $ (foldl1' (+) outputData) / (fromIntegral numOfPoints) -- testIntegration
+  myPrint $ (++) ("Pi = ") $ show $ ((*) 6.0 $ fromIntegral $ length $ filter (<1.0) outputData) / (fromIntegral numOfPoints) -- testPi
   myPrint $ "Sequence generation time: " ++ (show $ (fromIntegral $ genEnd - genStart) / 10^9)  ++ "ms"
   myPrint $ "Sequence transposition time: " ++ (show $ (fromIntegral $ transEnd - transStart) / 10^9)  ++ "ms"
   myPrint $ "OCL execution and IO time: " ++ (show $ (fromIntegral $ execEnd - execStart) / 10^9)  ++ "ms"
@@ -146,7 +145,8 @@ stringToFunction :: String -> Either ParseError FunctionExpression
 stringToFunction inputStr = parse parseIntegrate "Parse error" inputStr
 
 testString :: String
-testString = "Integrate[1/(x1#*x1#*x1# + 1)/(x2#*x2#*x2# + 1), {x1, 0, 1}, {x2, 0, 1}]"
+--testString = "Integrate[1/(x1#*x1#*x1# + 1)/(x2#*x2#*x2# + 1), {x1, 0, 1}, {x2, 0, 1}]" -- testIntegration
+testString = "Integrate[x1#*x1# + x2#*x2# + x3#*x3#, {x1, 0, 1}, {x2, 0, 1}, {x3, 0, 1}]" -- testPi
 
 -- GOAL: the program should take something like this as an input and produce the result
 testInput :: String
