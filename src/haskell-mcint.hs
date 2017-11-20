@@ -27,9 +27,9 @@ import System.CPUTime
 --import GHC.Prim -- raw unboxed types
 
 import Foreign( castPtr, nullPtr, sizeOf )
-import Foreign.Marshal.Array( newArray, peekArray, mallocArray )
+import Foreign.Marshal.Array( peekArray, mallocArray )
 import Foreign.Ptr( Ptr )
-
+import Foreign.ForeignPtr.Unsafe( unsafeForeignPtrToPtr )
 import System.Process( createProcess, std_err, std_in, std_out, StdStream( CreatePipe ), proc ) -- to run external program
 
 import KernelGen( genKernel )         -- module that generates OpenCL kernels, aka content of a .cl file
@@ -71,8 +71,12 @@ strToDouble !s = read s
 mystringToListOfPoints :: Int -> Int -> String -> (U.Vector Double)
 mystringToListOfPoints !n !d s = (U.fromListN (n * d)) . (map strToDouble) . words $ s
 
-myTranspose :: Int -> Int -> (U.Vector Double) -> [[Double]]
-myTranspose !n !d !v = map (\i -> (map (\j -> U.unsafeIndex v ((j-1)*d + i-1) ) [1..n] )) [1..d]
+--myTranspose :: Int -> Int -> (U.Vector Double) -> [[Double]]
+--myTranspose !n !d !v = map (\i -> (map (\j -> U.unsafeIndex v ((j-1)*d + i-1) ) [1..n] )) [1..d]
+myTranspose :: Int -> Int -> (U.Vector Double) -> [S.Vector Double]
+myTranspose !n !d !v = map (\i -> S.fromList (map (\j -> U.unsafeIndex v ((j-1)*d + i-1) ) [1..n] )) [1..d]
+
+unsafeStorableVectorToPtr = castPtr . unsafeForeignPtrToPtr . fst . (S.unsafeToForeignPtr0)
 
 compute :: FunctionExpression -> IO ()
 compute testFunction = do
@@ -100,12 +104,12 @@ compute testFunction = do
   genStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
   !xsPoints <- sobolGen numOfPoints nD
   genEnd <- getCPUTime
+  transStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
   let xsData = myTranspose numOfPoints nD xsPoints
 
   -- allocate memory for input data and pass pointers to it to the kernel
   -- fist nD arguments are for input data(see KernelGen.hs)
-  transStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
-  foldr1 (>>) [setKernelInputData context kernel (fromIntegral i) (xsData!!i) vecSize | i <- [0..nD-1]]
+  foldr1 (>>) [setKernelInputData context kernel (fromIntegral i) (xsData!!i) | i <- [0..nD-1]]
   transEnd <- getCPUTime
 
   -- allocate memory for output data(though we could reuse one of the pointers to the input data instead)
@@ -138,16 +142,13 @@ compute testFunction = do
       numOfPoints = (2^20 :: Int)
       -- dementions of input data(length xsData) and the function(nD) should be equal!
       nD = length $ variables testFunction -- number of dimensions
-      --xsPoints = transpose $ fmap ((gen1Dsec numOfPoints) . snd) $ variables testFunction -- xsPoints - list of points
-      --xsData = transpose xsPoints -- xsData - list of lists of point coordinates
       dataLength = numOfPoints
       vecSize = dataLength * (sizeOf (undefined :: Double)) -- size of data transmitted to an OpenCL device
       clText = genKernel testFunction
       functionName = name testFunction
       myPrint = hPutStrLn stdout -- prints to stdout, can be easily modified to print to a file or a port
       createConstBuffer context' size' ptr' = clCreateBuffer context' [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR] (size', ptr')
-      setKernelInputData context' kernel' argNum' data' dataSize' = ((newArray (data')) >>= (\xs -> (createConstBuffer context' dataSize' (castPtr xs)) >>= (\mem_xs -> clSetKernelArgSto kernel' argNum' mem_xs)))
-    --setKernelInputData = ((flip ((.) . (>>=) . newArray) .) .) . (. clSetKernelArgSto) . (.) . flip . ((flip . ((>>=) .)) .) . flip flip castPtr . ((.) .) . createConstBuffer
+      setKernelInputData context' kernel' argNum' vec = (createConstBuffer context' ((S.length vec) * (sizeOf (undefined :: Double))) (unsafeStorableVectorToPtr vec)) >>= (\mem_xs -> clSetKernelArgSto kernel' argNum' mem_xs)
     --createConstBuffer = (. (,)) . (.) . flip clCreateBuffer [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR]
     
 -- replaces list of platfrom IDs with their vendors
@@ -169,7 +170,7 @@ testNumOutput :: String
 testNumOutput = showCReal 100 $ ((1/18) * (2 * sqrt(3) * pi + log(64))) ** 2 -- the exact number with 100 digits precision
 testOutPut :: String
 testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477469051938999891540922414594979416232" -- the value of testNumOutput
-
+--testCLtext = "__kernel void Integrate(__global double *x1, __global double *x2, __global double *x3, __global double *out){int id = get_global_id(0);out[id] = x1[id]*x1[id] + x2[id]*x2[id] + x3[id]*x3[id];}"
 
 {-
 Next Steps:
