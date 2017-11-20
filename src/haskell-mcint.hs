@@ -174,10 +174,10 @@ testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477
 
 {-
 Next Steps:
-1) Improve parser/genKernel. Get rid of '#' character in testString
-2) Implement sobol sequence(might be unclear) or at least some sequence generator
-3) Modify genKernel to perform integration
-4) Use double precision
+1) Improve parser/genKernel. Get rid of '#' character in testString and allow pointer arithmetic in the kernel
+2) Pass packed array to GPU instead of doing intermediate transposition
+3) Modify genKernel to perform summation in parallel on GPU
+4) Make a haskell version of Joe and Kuo Sobol sequence generator
 
 Major TODOs:
 1) use function to generate function object from a string
@@ -204,7 +204,7 @@ TODO: Consider following improvements
 14) Revisit GPipe project for inspiration
 15) Checkout accelerate(array operations on GPU)
 16) Checkout shady-gen(another project for execution on GPU)
-
+17) Sobol sequence generation by GSL (GNU Scientific Library)
 -}
 
 
@@ -213,6 +213,6 @@ TODO: Consider following improvements
 2) OpenCLRAW seems to be too low level compared to OpenCL
 3) No need for Criterion library. Basic metrics can be checked via prelude
    and on per function basis
-4) 
+4) (S. Joe and F. Y. Kuo 2008) Sobol sequence generation solution is too slow, plus using it requires type conversions...
 
 -}
