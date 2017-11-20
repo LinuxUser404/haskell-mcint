@@ -28,6 +28,13 @@
   (major1) == 0 && (major2) <  10 || \
   (major1) == 0 && (major2) == 10 && (minor) <= 8)
 
+/* package containers-0.5.7.1 */
+#define VERSION_containers "0.5.7.1"
+#define MIN_VERSION_containers(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  5 || \
+  (major1) == 0 && (major2) == 5 && (minor) <= 7)
+
 /* package criterion-1.2.3.0 */
 #define VERSION_criterion "1.2.3.0"
 #define MIN_VERSION_criterion(major1,major2,minor) (\
@@ -41,6 +48,13 @@
   (major1) <  0 || \
   (major1) == 0 && (major2) <  5 || \
   (major1) == 0 && (major2) == 5 && (minor) <= 0)
+
+/* package gsl-random-0.5.3 */
+#define VERSION_gsl_random "0.5.3"
+#define MIN_VERSION_gsl_random(major1,major2,minor) (\
+  (major1) <  0 || \
+  (major1) == 0 && (major2) <  5 || \
+  (major1) == 0 && (major2) == 5 && (minor) <= 3)
 
 /* package numbers-3000.2.0.1 */
 #define VERSION_numbers "3000.2.0.1"

@@ -71,7 +71,6 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as U -- vectors for performance
 import qualified Data.Vector.Storable as S -- vectors for performance
 
-
 -- "g(i) = i xor (i div 2)"
 grayCode :: Int -> Int
 grayCode !i = xor i $ shift i (-1)
@@ -175,3 +174,21 @@ testInsideASphere !v = ((a*a + b*b + c*c) < 1.0)
     !a = U.unsafeIndex v 0
     !b = U.unsafeIndex v 1
     !c = U.unsafeIndex v 2
+--------------
+{- GLS implementation notes
+https://www.gnu.org/software/gsl/manual/html_node/Quasi_002drandom-number-generator-algorithms.html
+
+19.5 Quasi-random number generator algorithms
+
+The following quasi-random sequence algorithms are available,
+
+Generator: gsl_qrng_niederreiter_2
+This generator uses the algorithm described in Bratley, Fox, Niederreiter, ACM Trans. Model. Comp. Sim. 2, 195 (1992). It is valid up to 12 dimensions.
+
+Generator: gsl_qrng_sobol
+This generator uses the Sobol sequence described in Antonov, Saleev, USSR Comput. Maths. Math. Phys. 19, 252 (1980). It is valid up to 40 dimensions.
+
+Generator: gsl_qrng_halton
+Generator: gsl_qrng_reversehalton
+These generators use the Halton and reverse Halton sequences described in J.H. Halton, Numerische Mathematik 2, 84-90 (1960) and B. Vandewoestyne and R. Cools Computational and Applied Mathematics 189, 1&2, 341-361 (2006). They are valid up to 1229 dimensions.
+-}

@@ -12,7 +12,9 @@ import Control.Parallel.OpenCL
 import Data.Number.CReal( showCReal )  -- arbitrary precision real numbers
 import Data.List
 import Text.ParserCombinators.Parsec
+import GSL.Random.Quasi -- GLS implementation of Sobol sequence (up to 40 dimensions)
 
+import qualified Data.Sequence as Seq -- to sequence IO actions
 import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as U -- vectors for performance
 import qualified Data.Vector.Storable as S -- vectors for performance
@@ -45,6 +47,16 @@ main = do
   end <- getCPUTime
   hPutStrLn stdout $ "Total execution time: " ++ (show $ (fromIntegral $ end - start) / 10^9)  ++ "ms"
   return ()
+
+gslSobolGen :: Int -> Int -> IO (U.Vector Double)
+gslSobolGen n d = do
+  rng <- newQRNG sobol d
+  lst <- sequence (replicate n (getListSample rng))
+  return(U.concat $ map U.fromList lst)
+
+sobolGen :: Int -> Int -> IO (U.Vector Double)
+--sobolGen = generateSobolSequence
+sobolGen = gslSobolGen
 
 generateSobolSequence :: Int -> Int -> IO (U.Vector Double)
 generateSobolSequence n d = do
@@ -86,7 +98,7 @@ compute testFunction = do
   
   -- generate Sobol sequence data points
   genStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
-  !xsPoints <- generateSobolSequence numOfPoints nD
+  !xsPoints <- sobolGen numOfPoints nD
   genEnd <- getCPUTime
   let xsData = myTranspose numOfPoints nD xsPoints
 
@@ -135,7 +147,9 @@ compute testFunction = do
       myPrint = hPutStrLn stdout -- prints to stdout, can be easily modified to print to a file or a port
       createConstBuffer context' size' ptr' = clCreateBuffer context' [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR] (size', ptr')
       setKernelInputData context' kernel' argNum' data' dataSize' = ((newArray (data')) >>= (\xs -> (createConstBuffer context' dataSize' (castPtr xs)) >>= (\mem_xs -> clSetKernelArgSto kernel' argNum' mem_xs)))
-
+    --setKernelInputData = ((flip ((.) . (>>=) . newArray) .) .) . (. clSetKernelArgSto) . (.) . flip . ((flip . ((>>=) .)) .) . flip flip castPtr . ((.) .) . createConstBuffer
+    --createConstBuffer = (. (,)) . (.) . flip clCreateBuffer [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR]
+    
 -- replaces list of platfrom IDs with their vendors
 oclPlatformInfo :: [CLPlatformID] -> [IO String]
 oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
