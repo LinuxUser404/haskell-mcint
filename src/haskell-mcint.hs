@@ -4,7 +4,7 @@ Language: Haskell
 Program: Monte-Carlo integration with OpenCL in Haskell
 -}
 --module Main where
-{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BangPatterns #-} -- for strictness
 -- {-# MagicHash #-} -- for using raw unboxed types
 
 import System.IO
@@ -40,7 +40,7 @@ import FunctionParser
 main :: IO ()
 main = do
   start <- getCPUTime
-  case stringToFunction testString of
+  case parse parseIntegrate "Parse error" testString of
     Left  e -> (hPutStrLn stdout $ show e) -- if parser fails print the error
     Right func -> compute func             -- otherwise compute compute the input
   hFlush stdout
@@ -48,13 +48,13 @@ main = do
   hPutStrLn stdout $ "Total execution time: " ++ (show $ (fromIntegral $ end - start) / 10^9)  ++ "ms"
   return ()
 
-gslSobolGen :: Int -> Int -> IO (U.Vector Double)
+gslSobolGen :: Int -> Int -> IO (S.Vector Double)
 gslSobolGen n d = do
   rng <- newQRNG sobol d
   lst <- sequence (replicate n (getListSample rng))
-  return(U.concat $ map U.fromList lst)
+  return(S.concat $ map S.fromList lst)
 
-sobolGen :: Int -> Int -> IO (U.Vector Double)
+sobolGen :: Int -> Int -> IO (S.Vector Double)
 --sobolGen = generateSobolSequence
 sobolGen = gslSobolGen
 
@@ -71,10 +71,8 @@ strToDouble !s = read s
 mystringToListOfPoints :: Int -> Int -> String -> (U.Vector Double)
 mystringToListOfPoints !n !d s = (U.fromListN (n * d)) . (map strToDouble) . words $ s
 
---myTranspose :: Int -> Int -> (U.Vector Double) -> [[Double]]
---myTranspose !n !d !v = map (\i -> (map (\j -> U.unsafeIndex v ((j-1)*d + i-1) ) [1..n] )) [1..d]
-myTranspose :: Int -> Int -> (U.Vector Double) -> [S.Vector Double]
-myTranspose !n !d !v = map (\i -> S.fromList (map (\j -> U.unsafeIndex v ((j-1)*d + i-1) ) [1..n] )) [1..d]
+myTranspose :: Int -> Int -> (S.Vector Double) -> [S.Vector Double]
+myTranspose !n !d !v = map (\i -> S.fromList (map (\j -> (S.unsafeIndex) v (j * d + i) ) [0..n-1] )) [0..d-1]
 
 unsafeStorableVectorToPtr = castPtr . unsafeForeignPtrToPtr . fst . (S.unsafeToForeignPtr0)
 
@@ -130,8 +128,8 @@ compute testFunction = do
   --myPrint $ "Output array = " ++ show outputData
   
   -- calculate the sum of the output array, divide by number of points and print the result
---  myPrint $ (++) (testString ++ " = ") $ show $ (foldl1' (+) outputData) / (fromIntegral numOfPoints) -- testIntegration
-  myPrint $ (++) ("Pi = ") $ show $ ((*) 6.0 $ fromIntegral $ length $ filter (<1.0) outputData) / (fromIntegral numOfPoints) -- testPi
+  myPrint $ (++) (testString ++ " = ") $ show $ (foldl1' (+) outputData) / (fromIntegral numOfPoints) -- testIntegration
+--  myPrint $ (++) ("Pi = ") $ show $ ((*) 6.0 $ fromIntegral $ length $ filter (<1.0) outputData) / (fromIntegral numOfPoints) -- testPi
   myPrint $ "Sequence generation time: " ++ (show $ (fromIntegral $ genEnd - genStart) / 10^9)  ++ "ms"
   myPrint $ "Sequence transposition time: " ++ (show $ (fromIntegral $ transEnd - transStart) / 10^9)  ++ "ms"
   myPrint $ "OCL execution and IO time: " ++ (show $ (fromIntegral $ execEnd - execStart) / 10^9)  ++ "ms"
@@ -139,7 +137,7 @@ compute testFunction = do
   return()
     where
       platformNumber = 0 :: Int  -- using the first platform
-      numOfPoints = (2^20 :: Int)
+      numOfPoints = ((2^20) :: Int)
       -- dementions of input data(length xsData) and the function(nD) should be equal!
       nD = length $ variables testFunction -- number of dimensions
       dataLength = numOfPoints
@@ -156,20 +154,19 @@ oclPlatformInfo :: [CLPlatformID] -> [IO String]
 oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
 
 
-stringToFunction :: String -> Either ParseError FunctionExpression
-stringToFunction inputStr = parse parseIntegrate "Parse error" inputStr
 
 testString :: String
---testString = "Integrate[1/(x1#*x1#*x1# + 1)/(x2#*x2#*x2# + 1), {x1, 0, 1}, {x2, 0, 1}]" -- testIntegration
-testString = "Integrate[x1#*x1# + x2#*x2# + x3#*x3#, {x1, 0, 1}, {x2, 0, 1}, {x3, 0, 1}]" -- testPi
+testString = "Integrate[1/(x1#*x1#*x1# + 1)/(x2#*x2#*x2# + 1), {x1, 0.0, 1.0}, {x2, 0.0, 1.0}]" -- testIntegration
+--testString = "Integrate[exp((x#*x# + 1) * log(x#)), {x, -1000, exp(20)}]" -- testIntegration
+--testString = "Integrate[x1#*x1# + x2#*x2# + x3#*x3#, {x1, 0, 1}, {x2, 0, 1}, {x3, 0, 1}]" -- testPi
 
 -- GOAL: the program should take something like this as an input and produce the result
-testInput :: String
-testInput = "Integrate[1/(x^3 + 1)/(y^3 + 1), {x, 0, 1}, {y, 0, 1}]"
-testNumOutput :: String
-testNumOutput = showCReal 100 $ ((1/18) * (2 * sqrt(3) * pi + log(64))) ** 2 -- the exact number with 100 digits precision
-testOutPut :: String
-testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477469051938999891540922414594979416232" -- the value of testNumOutput
+--testInput :: String
+--testInput = "Integrate[1/(x^3 + 1)/(y^3 + 1), {x, 0, 1}, {y, 0, 1}]"
+--testNumOutput :: String
+--testNumOutput = showCReal 100 $ ((1/18) * (2 * sqrt(3) * pi + log(64))) ** 2 -- the exact number with 100 digits precision
+--testOutPut :: String
+--testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477469051938999891540922414594979416232" -- the value of testNumOutput
 --testCLtext = "__kernel void Integrate(__global double *x1, __global double *x2, __global double *x3, __global double *out){int id = get_global_id(0);out[id] = x1[id]*x1[id] + x2[id]*x2[id] + x3[id]*x3[id];}"
 
 {-

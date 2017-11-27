@@ -20,6 +20,6 @@ data FunctionExpression = FunctionExpression {
 } deriving Eq
 
 data Limits = Limits {
-  lower :: CDouble,
-  upper :: CDouble
+  lower :: Double,
+  upper :: Double
 } deriving Eq
