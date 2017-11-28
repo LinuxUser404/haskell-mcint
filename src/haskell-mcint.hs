@@ -5,19 +5,21 @@ Program: Monte-Carlo integration with OpenCL in Haskell
 -}
 --module Main where
 {-# LANGUAGE BangPatterns #-} -- for strictness
+--{-# ForeignFunctionInterface #-}
 -- {-# MagicHash #-} -- for using raw unboxed types
 
 import System.IO
 import Control.Parallel.OpenCL
-import Data.Number.CReal( showCReal )  -- arbitrary precision real numbers
+--import Data.Number.CReal( showCReal )  -- arbitrary precision real numbers
 import Data.List
 import Text.ParserCombinators.Parsec
 import GSL.Random.Quasi -- GLS implementation of Sobol sequence (up to 40 dimensions)
 
-import qualified Data.Sequence as Seq -- to sequence IO actions
-import qualified Data.Vector as V
-import qualified Data.Vector.Unboxed as U -- vectors for performance
-import qualified Data.Vector.Storable as S -- vectors for performance
+--import qualified Data.Sequence as Seq -- to sequence IO actions
+--import qualified Data.Vector as V
+import qualified Data.Vector.Unboxed as U -- vectors of unboxed types - best performance
+import qualified Data.Vector.Storable as S -- vectors of storable types - best for FFI
+--import qualified Data.Vector.Storable.Internal as SI
 
 -- criterion looks like an overkill for our purposes... CPUTime is what I use instead
 --import Criterion.Measurement -- for measuring performance
@@ -26,15 +28,18 @@ import System.CPUTime
 
 --import GHC.Prim -- raw unboxed types
 
-import Foreign( castPtr, nullPtr, sizeOf )
-import Foreign.Marshal.Array( peekArray, mallocArray )
+import Foreign( castPtr, nullPtr, sizeOf, allocaArray )
+import Foreign.Marshal.Array( peekArray, mallocArray, advancePtr )
 import Foreign.Ptr( Ptr )
+import Foreign.C
 import Foreign.ForeignPtr.Unsafe( unsafeForeignPtrToPtr )
-import System.Process( createProcess, std_err, std_in, std_out, StdStream( CreatePipe ), proc ) -- to run external program
 
 import KernelGen( genKernel )         -- module that generates OpenCL kernels, aka content of a .cl file
 import FunctionTypes
 import FunctionParser
+
+foreign import ccall "sobseq.h sobseq"
+  cSobolSeq :: Ptr (Double) -> Int -> Int -> IO ()
 
 -- TODO: consider switching to guards notation
 main :: IO ()
@@ -47,23 +52,31 @@ main = do
   end <- getCPUTime
   hPutStrLn stdout $ "Total execution time: " ++ (show $ (fromIntegral $ end - start) / 10^9)  ++ "ms"
   return ()
+{-
+cSobolGen :: Int -> Int -> IO (S.Vector Double)
+cSobolGen n d = do
+  myPtr <- (mallocArray d) :: IO (Ptr Double)
+  cSobolSeq myPtr d 0
+  return()
+-}
+
+
+fastSobolGen :: Int -> Int -> IO (S.Vector Double)
+fastSobolGen n d = do
+  ptr <- mallocArray (n*d)
+--  sequence (map (\i -> cSobolSeq (advancePtr ptr (i*d)) d i) [0..n-1])
+  foldr1 (>>) (map (\i -> cSobolSeq (advancePtr ptr (i*d)) d i) [0..n-1]) -- more than 10 times faster than sequence
+  lst <- peekArray (n*d) ptr
+  return(S.fromListN (n*d) lst)
 
 gslSobolGen :: Int -> Int -> IO (S.Vector Double)
 gslSobolGen n d = do
   rng <- newQRNG sobol d
   lst <- sequence (replicate n (getListSample rng))
-  return(S.concat $ map S.fromList lst)
+  return(S.fromListN (n*d) $ concat lst)
 
 sobolGen :: Int -> Int -> IO (S.Vector Double)
---sobolGen = generateSobolSequence
-sobolGen = gslSobolGen
-
-generateSobolSequence :: Int -> Int -> IO (U.Vector Double)
-generateSobolSequence n d = do
-  -- initialize sobol sequence generator(external program that uses pre-calculated direction numbers)
-  (_, Just hout, _, _) <- createProcess (proc "./src/sobol" [show n,show d,"./src/direction_numbers-joe-kuo-6.21201"]){std_in = CreatePipe, std_out = CreatePipe, std_err = CreatePipe}
-  sobolStr <- hGetContents hout
-  return ((mystringToListOfPoints n d) sobolStr)
+sobolGen = fastSobolGen
 
 strToDouble :: String -> Double
 strToDouble !s = read s
@@ -71,8 +84,8 @@ strToDouble !s = read s
 mystringToListOfPoints :: Int -> Int -> String -> (U.Vector Double)
 mystringToListOfPoints !n !d s = (U.fromListN (n * d)) . (map strToDouble) . words $ s
 
-myTranspose :: Int -> Int -> (S.Vector Double) -> [S.Vector Double]
-myTranspose !n !d !v = map (\i -> S.fromList (map (\j -> (S.unsafeIndex) v (j * d + i) ) [0..n-1] )) [0..d-1]
+--myTranspose :: Int -> Int -> (S.Vector Double) -> [S.Vector Double]
+--myTranspose !n !d !v = map (\i -> S.fromList (map (\j -> (S.unsafeIndex) v (j * d + i) ) [0..n-1] )) [0..d-1]
 
 unsafeStorableVectorToPtr = castPtr . unsafeForeignPtrToPtr . fst . (S.unsafeToForeignPtr0)
 
@@ -100,20 +113,16 @@ compute testFunction = do
   
   -- generate Sobol sequence data points
   genStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
-  !xsPoints <- sobolGen numOfPoints nD
-  genEnd <- getCPUTime
-  transStart <- getCPUTime -- actual generation happens here, since this is when xsData gets first used
-  let xsData = myTranspose numOfPoints nD xsPoints
+  xsPoints <- sobolGen numOfPoints nD
 
   -- allocate memory for input data and pass pointers to it to the kernel
-  -- fist nD arguments are for input data(see KernelGen.hs)
-  foldr1 (>>) [setKernelInputData context kernel (fromIntegral i) (xsData!!i) | i <- [0..nD-1]]
-  transEnd <- getCPUTime
+  setKernelInputData context kernel 0 xsPoints -- 0th argument is the input
+  genEnd <- getCPUTime
 
   -- allocate memory for output data(though we could reuse one of the pointers to the input data instead)
   out <- (mallocArray dataLength) :: IO (Ptr Double) -- this pointer is used later to retrieve the data from OpenCL device
   mem_out <- clCreateBuffer context [CL_MEM_WRITE_ONLY] (vecSize, nullPtr)
-  clSetKernelArgSto kernel (fromIntegral nD) mem_out  -- kernel's last agrument is the output(see KernelGen.hs)
+  clSetKernelArgSto kernel (fromIntegral 1) mem_out  -- kernel's last agrument(1) is the output(see KernelGen.hs)
   
   -- create command queue and queue the execution on a device
   execStart <- getCPUTime
@@ -131,23 +140,23 @@ compute testFunction = do
   myPrint $ (++) (testString ++ " = ") $ show $ (foldl1' (+) outputData) / (fromIntegral numOfPoints) -- testIntegration
 --  myPrint $ (++) ("Pi = ") $ show $ ((*) 6.0 $ fromIntegral $ length $ filter (<1.0) outputData) / (fromIntegral numOfPoints) -- testPi
   myPrint $ "Sequence generation time: " ++ (show $ (fromIntegral $ genEnd - genStart) / 10^9)  ++ "ms"
-  myPrint $ "Sequence transposition time: " ++ (show $ (fromIntegral $ transEnd - transStart) / 10^9)  ++ "ms"
+--  myPrint $ "Sequence transposition time: " ++ (show $ (fromIntegral $ transEnd - transStart) / 10^9)  ++ "ms"
   myPrint $ "OCL execution and IO time: " ++ (show $ (fromIntegral $ execEnd - execStart) / 10^9)  ++ "ms"
   
   return()
     where
       platformNumber = 0 :: Int  -- using the first platform
-      numOfPoints = ((2^20) :: Int)
+      numOfPoints = ((2^20) :: Int) -- 2^27 takes a bit less than 32 GiB of memory
       -- dementions of input data(length xsData) and the function(nD) should be equal!
       nD = length $ variables testFunction -- number of dimensions
       dataLength = numOfPoints
       vecSize = dataLength * (sizeOf (undefined :: Double)) -- size of data transmitted to an OpenCL device
-      clText = genKernel testFunction
+--      clText = genKernel testFunction
+      clText = testCLtext
       functionName = name testFunction
       myPrint = hPutStrLn stdout -- prints to stdout, can be easily modified to print to a file or a port
       createConstBuffer context' size' ptr' = clCreateBuffer context' [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR] (size', ptr')
       setKernelInputData context' kernel' argNum' vec = (createConstBuffer context' ((S.length vec) * (sizeOf (undefined :: Double))) (unsafeStorableVectorToPtr vec)) >>= (\mem_xs -> clSetKernelArgSto kernel' argNum' mem_xs)
-    --createConstBuffer = (. (,)) . (.) . flip clCreateBuffer [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR]
     
 -- replaces list of platfrom IDs with their vendors
 oclPlatformInfo :: [CLPlatformID] -> [IO String]
@@ -167,7 +176,7 @@ testString = "Integrate[1/(x1#*x1#*x1# + 1)/(x2#*x2#*x2# + 1), {x1, 0.0, 1.0}, {
 --testNumOutput = showCReal 100 $ ((1/18) * (2 * sqrt(3) * pi + log(64))) ** 2 -- the exact number with 100 digits precision
 --testOutPut :: String
 --testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477469051938999891540922414594979416232" -- the value of testNumOutput
---testCLtext = "__kernel void Integrate(__global double *x1, __global double *x2, __global double *x3, __global double *out){int id = get_global_id(0);out[id] = x1[id]*x1[id] + x2[id]*x2[id] + x3[id]*x3[id];}"
+testCLtext = "__kernel void Integrate(__global double *x, __global double *out){int id = get_global_id(0);out[id] = 1/(x[id]*x[id]*x[id] + 1)/(x[id+1]*x[id+1]*x[id+1] + 1);}"
 
 {-
 Next Steps:
@@ -202,6 +211,7 @@ TODO: Consider following improvements
 15) Checkout accelerate(array operations on GPU)
 16) Checkout shady-gen(another project for execution on GPU)
 17) Sobol sequence generation by GSL (GNU Scientific Library)
+18) Pass huge chunks of memory to GPU(streaming textures?), 32GiB seems to be fine
 -}
 
 
@@ -211,5 +221,5 @@ TODO: Consider following improvements
 3) No need for Criterion library. Basic metrics can be checked via prelude
    and on per function basis
 4) (S. Joe and F. Y. Kuo 2008) Sobol sequence generation solution is too slow, plus using it requires type conversions...
-
+5) fromListN is more efficient than (force . fromList)
 -}

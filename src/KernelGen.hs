@@ -10,8 +10,8 @@ import Data.List(intercalate)
 import FunctionTypes
 
 genKernel :: FunctionExpression -> String
-genKernel expr = "#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n"
-               ++ "__kernel " ++ "void " ++ (name expr)
+genKernel expr = {-"#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n"
+	++ -}      "__kernel " ++ "void " ++ (name expr)
                ++ "(" ++ (intercalate ", " (args ++ outarg:[]) ) ++ ")"
                ++ "{"
                ++ "int id = get_global_id(0);"
