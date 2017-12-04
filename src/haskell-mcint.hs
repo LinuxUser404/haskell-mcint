@@ -16,7 +16,7 @@ import Text.ParserCombinators.Parsec
 import GSL.Random.Quasi -- GLS implementation of Sobol sequence (up to 40 dimensions)
 
 --import qualified Data.Sequence as Seq -- to sequence IO actions
---import qualified Data.Vector as V
+import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as U -- vectors of unboxed types - best performance
 import qualified Data.Vector.Storable as S -- vectors of storable types - best for FFI
 --import qualified Data.Vector.Storable.Internal as SI
@@ -81,8 +81,8 @@ sobolGen = fastSobolGen
 strToDouble :: String -> Double
 strToDouble !s = read s
 
-mystringToListOfPoints :: Int -> Int -> String -> (U.Vector Double)
-mystringToListOfPoints !n !d s = (U.fromListN (n * d)) . (map strToDouble) . words $ s
+--mystringToListOfPoints :: Int -> Int -> String -> (U.Vector Double)
+--mystringToListOfPoints !n !d s = (U.fromListN (n * d)) . (map strToDouble) . words $ s
 
 --myTranspose :: Int -> Int -> (S.Vector Double) -> [S.Vector Double]
 --myTranspose !n !d !v = map (\i -> S.fromList (map (\j -> (S.unsafeIndex) v (j * d + i) ) [0..n-1] )) [0..d-1]
@@ -147,12 +147,13 @@ compute testFunction = do
     where
       platformNumber = 0 :: Int  -- using the first platform
       numOfPoints = ((2^20) :: Int) -- 2^27 takes a bit less than 32 GiB of memory
+--      numOfPoints = (1366 :: Int) -- 2^27 takes a bit less than 32 GiB of memory
       -- dementions of input data(length xsData) and the function(nD) should be equal!
       nD = length $ variables testFunction -- number of dimensions
       dataLength = numOfPoints
       vecSize = dataLength * (sizeOf (undefined :: Double)) -- size of data transmitted to an OpenCL device
---      clText = genKernel testFunction
-      clText = testCLtext
+      clText = genKernel testFunction
+--      clText = testCLtext
       functionName = name testFunction
       myPrint = hPutStrLn stdout -- prints to stdout, can be easily modified to print to a file or a port
       createConstBuffer context' size' ptr' = clCreateBuffer context' [CL_MEM_READ_ONLY, CL_MEM_COPY_HOST_PTR] (size', ptr')
@@ -165,7 +166,7 @@ oclPlatformInfo = map (\pid -> clGetPlatformInfo pid CL_PLATFORM_VENDOR)
 
 
 testString :: String
-testString = "Integrate[1/(x1#*x1#*x1# + 1)/(x2#*x2#*x2# + 1), {x1, 0.0, 1.0}, {x2, 0.0, 1.0}]" -- testIntegration
+testString = "Integrate[1/(x1*x1*x1 + 1)/(x2*x2*x2 + 1), {x1, 0.0, 1.0}, {x2, 0.0, 1.0}]" -- testIntegration
 --testString = "Integrate[exp((x#*x# + 1) * log(x#)), {x, -1000, exp(20)}]" -- testIntegration
 --testString = "Integrate[x1#*x1# + x2#*x2# + x3#*x3#, {x1, 0, 1}, {x2, 0, 1}, {x3, 0, 1}]" -- testPi
 
@@ -176,14 +177,19 @@ testString = "Integrate[1/(x1#*x1#*x1# + 1)/(x2#*x2#*x2# + 1), {x1, 0.0, 1.0}, {
 --testNumOutput = showCReal 100 $ ((1/18) * (2 * sqrt(3) * pi + log(64))) ** 2 -- the exact number with 100 digits precision
 --testOutPut :: String
 --testOutPut = "0.6983089976061547905950713595903295502322592708600975842346346477469051938999891540922414594979416232" -- the value of testNumOutput
-testCLtext = "__kernel void Integrate(__global double *x, __global double *out){int id = get_global_id(0);out[id] = 1/(x[id]*x[id]*x[id] + 1)/(x[id+1]*x[id+1]*x[id+1] + 1);}"
-
+{-testCLtext = "__kernel void Integrate(__global double *x, __global double *out){" ++
+             "int id = get_global_id(0);" ++
+             "const double x0 = x[id + 0];" ++
+             "const double x1 = x[id + 1];" ++
+             "out[id] = 0;" ++
+             "out[id] += 1/(x0*x0*x0 + 1)/(x1*x1*x1 + 1);" ++
+             "}}" ++
+             "}"
+-}
 {-
 Next Steps:
-1) Improve parser/genKernel. Get rid of '#' character in testString and allow pointer arithmetic in the kernel
-2) Pass packed array to GPU instead of doing intermediate transposition
-3) Modify genKernel to perform summation in parallel on GPU
-4) Make a haskell version of Joe and Kuo Sobol sequence generator
+1) Make a haskell version of Joe and Kuo Sobol sequence generator
+
 
 Major TODOs:
 1) use function to generate function object from a string
@@ -222,4 +228,5 @@ TODO: Consider following improvements
    and on per function basis
 4) (S. Joe and F. Y. Kuo 2008) Sobol sequence generation solution is too slow, plus using it requires type conversions...
 5) fromListN is more efficient than (force . fromList)
+6) Parser mostly abandoned, kernel compilation is fast enough
 -}
