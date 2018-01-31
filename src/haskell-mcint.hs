@@ -3,7 +3,6 @@ Author: Nick(Mykola) Pershyn
 Language: Haskell
 Program: Monte-Carlo integration with OpenCL in Haskell
 -}
---module Main where
 {-# LANGUAGE BangPatterns #-} -- for strictness
 --{-# ForeignFunctionInterface #-}
 -- {-# MagicHash #-} -- for using raw unboxed types
@@ -37,6 +36,7 @@ import Foreign.ForeignPtr.Unsafe( unsafeForeignPtrToPtr )
 import KernelGen( genKernel )         -- module that generates OpenCL kernels, aka content of a .cl file
 import FunctionTypes
 import FunctionParser
+import SobolGen( highDSobolGenIO )
 
 foreign import ccall "sobseq.h sobseq"
   cSobolSeq :: Ptr (Double) -> Int -> Int -> IO ()
@@ -146,7 +146,7 @@ compute testFunction = do
   return()
     where
       platformNumber = 0 :: Int  -- using the first platform
-      numOfPoints = ((2^20) :: Int) -- 2^27 takes a bit less than 32 GiB of memory
+      numOfPoints = ((2^15) :: Int) -- 2^27 takes a bit less than 32 GiB of memory
 --      numOfPoints = (1366 :: Int) -- 2^27 takes a bit less than 32 GiB of memory
       -- dementions of input data(length xsData) and the function(nD) should be equal!
       nD = length $ variables testFunction -- number of dimensions
@@ -229,4 +229,7 @@ TODO: Consider following improvements
 4) (S. Joe and F. Y. Kuo 2008) Sobol sequence generation solution is too slow, plus using it requires type conversions...
 5) fromListN is more efficient than (force . fromList)
 6) Parser mostly abandoned, kernel compilation is fast enough
+7) https://forums.khronos.org/showthread.php/6072-out-of-resources-when-clEnqueueReadBuffer
+"- the "out of resources" error can also be caused by a 5s timeout if the (NVidia) card is also being used as a display"
+need to queue multiple executions or uses a dedicated GPU.
 -}

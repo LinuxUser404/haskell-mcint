@@ -98,6 +98,13 @@
   (major1) == 0 && (major2) <  28 || \
   (major1) == 0 && (major2) == 28 && (minor) <= 2)
 
+/* tool cpphs-1.20.8 */
+#define TOOL_VERSION_cpphs "1.20.8"
+#define MIN_TOOL_VERSION_cpphs(major1,major2,minor) (\
+  (major1) <  1 || \
+  (major1) == 1 && (major2) <  20 || \
+  (major1) == 1 && (major2) == 20 && (minor) <= 8)
+
 /* tool gcc-5.4.0 */
 #define TOOL_VERSION_gcc "5.4.0"
 #define MIN_TOOL_VERSION_gcc(major1,major2,minor) (\

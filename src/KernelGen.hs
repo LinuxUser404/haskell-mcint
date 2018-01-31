@@ -22,7 +22,7 @@ genKernel expr = {-"#pragma OPENCL EXTENSION cl_khr_fp64 : enable\n"
                ++ "}"
   where
     subDiv :: Int
-    subDiv = 2^7
+    subDiv = 2^10
     args  = concatMap var [0..dim-1]
     limit i = "const double lower" ++ (show i) ++ " = " ++ (show $ lower . snd $ (variables expr)!!i) ++ ";"
            ++ "const double upper" ++ (show i) ++ " = " ++ (show $ upper . snd $ (variables expr)!!i) ++ ";"
