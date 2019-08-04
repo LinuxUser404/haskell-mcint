@@ -24,13 +24,13 @@ executable haskell-mcint
   -- other-extensions:
   build-depends:       base >=4.9 && <5.0,
                        OpenCL,
-                       numbers,
+                       -- numbers,
                        parsec,
-                       criterion,
+                       -- criterion,
                        process,
                        vector,
-                       bytestring,
-                       ghc-prim,
+                       -- bytestring,
+                       -- ghc-prim,
                        gsl-random,
                        containers,
                        integer-gmp
