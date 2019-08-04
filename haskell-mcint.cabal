@@ -18,11 +18,11 @@ cabal-version:       >=2.0
 executable haskell-mcint
   hs-source-dirs:      src
   main-is:             haskell-mcint.hs
-  ghc-options:         -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
+--  ghc-options:         -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
   c-sources:           src/sobseq.c
-  other-modules:       FunctionTypes, FunctionParser, KernelGen, SequenceGen
+  other-modules:       FunctionTypes, FunctionParser, KernelGen, SequenceGen, SobolGen
   -- other-extensions:
-  build-depends:       base >=4.8 && <5.0,
+  build-depends:       base >=4.9 && <5.0,
                        OpenCL,
                        numbers,
                        parsec,
@@ -32,5 +32,6 @@ executable haskell-mcint
                        bytestring,
                        ghc-prim,
                        gsl-random,
-                       containers
+                       containers,
+                       integer-gmp
   default-language:    Haskell2010
