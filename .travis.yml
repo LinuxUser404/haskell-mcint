@@ -9,4 +9,4 @@ before_install:
   - cabal v2-install alex
   - cabal v2-install happy
   - cabal v2-install c2hs
-  - sudo apt install opencl-icd opencl-headers
+  - sudo apt install mesa-opencl-icd opencl-headers
