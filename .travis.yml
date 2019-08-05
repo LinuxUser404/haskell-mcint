@@ -1,7 +1,6 @@
 sudo: false
 language: haskell
 cabal:
-  - "2.2"
   - "2.4"
 ghc:
   - "8.0"
