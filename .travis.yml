@@ -11,4 +11,4 @@ before_install:
   - cabal v2-install alex
   - cabal v2-install happy
   - cabal v2-install c2hs
-  - sudo apt install pocl-opencl-icd opencl-headers
+  - sudo apt install ocl-icd-opencl-dev opencl-headers
