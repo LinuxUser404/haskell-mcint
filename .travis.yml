@@ -6,7 +6,7 @@ ghc:
   - 8.4
   - 8.6
 before_install:
-  - cabal install alex
-  - cabal install happy
-  - cabal install c2hs
+  - cabal v2-install alex
+  - cabal v2-install happy
+  - cabal v2-install c2hs
   - sudo apt install opencl-icd opencl-headers
