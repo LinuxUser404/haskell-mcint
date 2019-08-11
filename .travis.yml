@@ -1,14 +1,24 @@
-sudo: false
 language: haskell
 cabal:
   - "2.4"
+cache:
+  directories:
+    - $HOME/.cabal
+addons:
+  apt:
+    packages:
+      - ocl-icd-opencl-dev
+      - opencl-headers
+      - libgsl-dev
 ghc:
   - "8.0"
   - "8.2"
   - "8.4"
   - "8.6"
-before_install:
+install:
   - cabal v2-install alex
   - cabal v2-install happy
   - cabal v2-install c2hs
-  - sudo apt install ocl-icd-opencl-dev opencl-headers libgsl-dev
+  - cabal v2-build all --only-dependencies
+script:
+  - cabal v2-build all
